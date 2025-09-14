@@ -1,0 +1,15 @@
+landing page belum rapih
+dashboard admin & user
+fungsi search sort di semua table
+delete proses | kasih confirm sebelum delete
+notifikasi sukses after action & loading cek lagi
+eliminasi menu by user login di middleware
+tombol remove filenya ketika di detail buang (ojak udah ada source)
+grid system tampilan
+rules validasi email harus email & nohp harus no hp (low priority)
+di laporan search, filter (periode & tahun), sorting
+
+api profile file izin detail
+api middleware be
+api group by periode dan tahun
+api dashboard

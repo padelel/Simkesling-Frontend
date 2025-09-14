@@ -1,0 +1,14 @@
+# BEGIN Force to HTTPS 
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{HTTPS} off
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+# END Force to HTTPS
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+PassengerAppRoot "/home/lalapand/fe2-simkesling.lalapan-depok.com"
+PassengerBaseURI "/"
+PassengerNodejs "/home/lalapand/nodevenv/fe2-simkesling.lalapan-depok.com/18/bin/node"
+PassengerAppType node
+PassengerStartupFile server.js
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
