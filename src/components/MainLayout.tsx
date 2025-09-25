@@ -11,6 +11,7 @@ import {
   HomeOutlined,
   SafetyCertificateOutlined,
   TableOutlined,
+  DownOutlined,
 } from "@ant-design/icons";
 import { Layout, Menu, Spin, theme, Typography } from "antd";
 import React, { ReactNode, useEffect, useState } from "react";
@@ -45,8 +46,20 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, title }) => {
     {
       icon: <DashboardOutlined />,
       label: "Dashboard",
-      path: "/dashboard/user",
       level: "user",
+      type: "submenu",
+      children: [
+        {
+          label: "Dashboard Limbah B3",
+          path: "/dashboard/user/limbah-padat/dashboard",
+          level: "user",
+        },
+        {
+          label: "Dashboard Limbah Cair",
+          path: "/dashboard/user/limbah-cair/dashboard",
+          level: "user",
+        },
+      ],
     },
     {
       icon: <CarOutlined />,
@@ -63,8 +76,25 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, title }) => {
     {
       icon: <BarChartOutlined />,
       label: "Laporan Limbah",
-      path: "/dashboard/user/limbah",
       level: "user",
+      type: "submenu",
+      children: [
+        {
+          label: "Laporan Limbah B3",
+          path: "/dashboard/user/limbah-padat",
+          level: "user",
+        },
+        {
+          label: "Laporan Limbah Cair",
+          path: "/dashboard/user/limbah-cair",
+          level: "user",
+        },
+        {
+          label: "Laporan Pemeriksaan Lab Lainnya",
+          path: "/dashboard/user/lab-lainnya",
+          level: "user",
+        },
+      ],
     },
     {
       icon: <ProfileOutlined />,
@@ -75,8 +105,20 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, title }) => {
     {
       icon: <HomeOutlined />,
       label: "Dashboard",
-      path: "/dashboard/admin",
       level: "admin",
+      type: "submenu",
+      children: [
+        {
+          label: "Limbah B3",
+          path: "/dashboard/admin/limbah-padat",
+          level: "admin",
+        },
+        {
+          label: "Limbah Cair",
+          path: "/dashboard/admin/limbah-cair",
+          level: "admin",
+        },
+      ],
     },
     {
       icon: <TableOutlined />,
@@ -99,14 +141,43 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, title }) => {
     {
       icon: <TableOutlined />,
       label: "Manajemen Laporan",
-      path: "/dashboard/admin/manajemen/laporan",
       level: "admin",
+      type: "submenu",
+      children: [
+        {
+          label: "Laporan Limbah B3",
+          path: "/dashboard/admin/manajemen/laporan/limbah-padat",
+          level: "admin",
+        },
+        {
+          label: "Laporan Limbah Cair",
+          path: "/dashboard/admin/manajemen/laporan/limbah-cair",
+          level: "admin",
+        },
+        {
+          label: "Laporan Pemeriksaan Lab Lainnya",
+          path: "/dashboard/admin/manajemen/laporan/lab-lainnya",
+          level: "admin",
+        },
+      ],
     },
     {
       icon: <TableOutlined />,
       label: "Manajemen Laporan Rekapitulasi",
-      path: "/dashboard/admin/manajemen/laporan-rekapitulasi",
       level: "admin",
+      type: "submenu",
+      children: [
+        {
+          label: "Limbah B3",
+          path: "/dashboard/admin/manajemen/laporan-rekapitulasi/limbah-padat",
+          level: "admin",
+        },
+        {
+          label: "Limbah Cair",
+          path: "/dashboard/admin/manajemen/laporan-rekapitulasi/limbah-cair",
+          level: "admin",
+        },
+      ],
     },
     {
       icon: <LogoutOutlined />,
@@ -119,14 +190,16 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, title }) => {
   }));
 
   const onClickMenu = async (item: any) => {
-    const clicked = items.find((_item) => _item.key === item.key);
-    if (clicked?.label.toLowerCase() == "logout") {
+    // For submenu items, the key is the path
+    if (item.key === "/") {
+      // Logout case
       if (userLoginStore.prosesLogout) {
         let a = await userLoginStore.prosesLogout();
-        router.push(clicked!.path);
+        router.push("/");
       }
     } else {
-      router.push(clicked!.path);
+      // For regular menu items and submenu items, use the key as path
+      router.push(item.key);
     }
   };
 
@@ -185,7 +258,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, title }) => {
             marginTop: "30px",
           }}>
           <Image
-            preview={false}
             width={75}
             height={85}
             src="/icon-navbar/kotadepok.png"
@@ -228,24 +300,37 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, title }) => {
           mode="inline"
           defaultSelectedKeys={[router.pathname]}
           selectedKeys={[router.pathname]}
-          onClick={onClickMenu}>
-          {items.map((item) => (
-            <Menu.Item key={item.key}>
-              <Link href={item.path} legacyBehavior>
-                {/* <a target="_blank" rel="noopener noreferrer">
-                </a> */}
-                {/* <>
-                  {item.icon}
-                  <span>{item.label}</span>
-                </> */}
-                <a>
-                  {item.icon}
-                  <span>{item.label}</span>
-                </a>
-              </Link>
-            </Menu.Item>
-          ))}
-        </Menu>
+          items={items.map((item) => {
+            if (item.type === "submenu") {
+              return {
+                key: item.label,
+                icon: item.icon,
+                label: item.label,
+                children: item.children?.map((child: any) => ({
+                  key: child.path,
+                  label: (
+                    <Link href={child.path} legacyBehavior>
+                      <a>{child.label}</a>
+                    </Link>
+                  ),
+                })),
+              };
+            } else {
+              return {
+                key: item.key,
+                icon: item.icon,
+                label: (
+                  <Link href={item.path} legacyBehavior>
+                    <a>
+                      <span>{item.label}</span>
+                    </a>
+                  </Link>
+                ),
+              };
+            }
+          })}
+          onClick={onClickMenu}
+        />
       </Sider>
       <Layout>
         <Header style={{ padding: 0, background: colorBgContainer }}>

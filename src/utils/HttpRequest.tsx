@@ -14,8 +14,8 @@ const api = axios.create({
   // baseURL: "http://192.168.228.190:8000/api/v1", // Your API base URL
   timeout: 30000, // Request timeout in milliseconds
   headers: {
-    // "Content-Type": "application/json",
-    "Content-Type": "multipart/form-data",
+    "Content-Type": "application/json",
+    // "Content-Type": "multipart/form-data",
   },
 });
 

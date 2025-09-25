@@ -98,7 +98,6 @@ const FormPengajuanLimbah: React.FC = () => {
   const laporanBulananStore = useLaporanBulananStore();
   const [linkUploadManifest, setlinkUploadManifest] = useState("");
   const [linkUploadLogbook, setlinkLogbook] = useState("");
-  const [linkUploadIpal, setlinkIpal] = useState("");
   const [linkUploadLabLain, setlinkLabLain] = useState("");
   const [linkUploadLingkungan, setlinkDokLingkungan] = useState("");
   const [linkUploadSwaPantau, setlinkSwaPantau] = useState("");
@@ -153,32 +152,29 @@ const FormPengajuanLimbah: React.FC = () => {
     berat_limbah_total: "",
     limbah_b3_covid: "",
     limbah_b3_nonmedis: "",
-    debit_limbah_cair: "",
+    limbah_cair_b3: "", // Field baru untuk limbah cair B3
     catatan: "",
     link_input_manifest: "",
     link_input_logbook: "",
-    link_input_lab_ipal: "",
     link_input_lab_lain: "",
     link_input_dokumen_lingkungan_rs: "",
     link_input_swa_pantau: "-",
     link_input_ujilab_cair: "-",
     limbah_jarum: "-",
-    limbah_sludge_ipal: "-",
     limbah_padat_infeksius: "-",
   };
 
   const [form, setForm] = useState(cloneDeep(tmpForm));
 
-  // Auto calculate total limbah padat
+  // Auto calculate total limbah B3
   useEffect(() => {
     const covid = parseFloat(form.limbah_b3_covid) || 0;
     const nonmedis = parseFloat(form.limbah_b3_nonmedis) || 0;
     const jarum = parseFloat(form.limbah_jarum) || 0;
-    const sludge = parseFloat(form.limbah_sludge_ipal) || 0;
+    const cairB3 = parseFloat(form.limbah_cair_b3) || 0; // Tambah limbah cair B3
     const infeksius = parseFloat(form.limbah_padat_infeksius) || 0;
-    const cair = parseFloat(form.debit_limbah_cair) || 0;
     
-    const total = parseFloat((covid + nonmedis + jarum + sludge + infeksius + cair).toFixed(2));
+    const total = parseFloat((covid + nonmedis + jarum + cairB3 + infeksius).toFixed(2));
     
     setForm(prev => ({
       ...prev,
@@ -191,7 +187,7 @@ const FormPengajuanLimbah: React.FC = () => {
         form_beratLimbah: total.toString()
       });
     }
-  }, [form.limbah_b3_covid, form.limbah_b3_nonmedis, form.limbah_jarum, form.limbah_sludge_ipal, form.limbah_padat_infeksius, form.debit_limbah_cair]);
+  }, [form.limbah_b3_covid, form.limbah_b3_nonmedis, form.limbah_jarum, form.limbah_cair_b3, form.limbah_padat_infeksius]);
 
   const beforeUploadFileDynamic = (file: RcFile) => {
     return false;
@@ -288,6 +284,18 @@ const FormPengajuanLimbah: React.FC = () => {
     let dataForm: any = new FormData();
     dataForm.append("oldid", form.oldid);
     dataForm.append("id_transporter", form.id_transporter);
+    
+    // Add nama_transporter to save transporter name in database
+     const selectedTransporterOption = transporterOptions.find(
+       (option) => option.value === form.id_transporter.toString()
+     );
+     if (selectedTransporterOption) {
+       dataForm.append("nama_transporter", selectedTransporterOption.label);
+       console.log("Sending nama_transporter:", selectedTransporterOption.label);
+     } else {
+       console.log("No transporter option found for ID:", form.id_transporter);
+       console.log("Available transporter options:", transporterOptions);
+     }
     // dataForm.append("nama_pemusnah", form.namapemusnah);
     // dataForm.append("metode_pemusnah", form.metodepemusnah);
     dataForm.append("berat_limbah_total", form.berat_limbah_total);
@@ -297,15 +305,12 @@ const FormPengajuanLimbah: React.FC = () => {
     // dataForm.append("ukuran_pemusnahan_sendiri", form.ukuranpemusnah);
     dataForm.append("limbah_b3_covid", form.limbah_b3_covid);
     dataForm.append("limbah_b3_nonmedis", form.limbah_b3_nonmedis);
-    dataForm.append("debit_limbah_cair", form.debit_limbah_cair);
-    // dataForm.append("kapasitas_ipal", form.kapasitasinpal);
-    // dataForm.append("memenuhi_syarat", form.stastuslimbahcair);
+    dataForm.append("limbah_cair_b3", form.limbah_cair_b3); // Field baru untuk limbah cair B3
     dataForm.append("catatan", form.catatan);
     dataForm.append("tahun", parseInt(form.tahun));
     dataForm.append("periode", parseInt(form.periode));
     dataForm.append("link_input_manifest", form.link_input_manifest);
     dataForm.append("link_input_logbook", form.link_input_logbook);
-    dataForm.append("link_input_lab_ipal", form.link_input_lab_ipal);
     dataForm.append("link_input_lab_lain", form.link_input_lab_lain);
     dataForm.append(
       "link_input_dokumen_lingkungan_rs",
@@ -314,7 +319,6 @@ const FormPengajuanLimbah: React.FC = () => {
     dataForm.append("link_input_swa_pantau", "--");
     dataForm.append("link_input_ujilab_cair", "--");
     dataForm.append("limbah_jarum", form.limbah_jarum);
-    dataForm.append("limbah_sludge_ipal", form.limbah_sludge_ipal);
     dataForm.append("limbah_padat_infeksius", form.limbah_padat_infeksius);
 
     // fileLogbook.forEach((file, index) => {
@@ -364,7 +368,7 @@ const FormPengajuanLimbah: React.FC = () => {
       Notif("success", "Sukses", "Berhasil tambah laporan.!");
       console.log(limbahPadatList);
       console.log(responsenya);
-      router.push("/dashboard/user/limbah");
+      router.push("/dashboard/user/limbah-padat");
     } catch (e) {
       console.error(e);
     } finally {
@@ -482,10 +486,6 @@ const FormPengajuanLimbah: React.FC = () => {
     }
     // console.log(user.link_input_logbook);
 
-    setlinkUploadManifest(user.link_manifest);
-    setlinkLogbook(user.link_logbook);
-    setlinkIpal(user.link_lab_ipal);
-    setlinkLabLain(user.link_lab_lain);
     setlinkDokLingkungan(user.link_dokumen_lingkungan_rs);
     setlinkSwaPantau(user.link_swa_pantau);
     setlinkUjiLabCair(user.link_lab_limbah_cair);
@@ -536,8 +536,8 @@ const FormPengajuanLimbah: React.FC = () => {
       //   ukurantps: laporanBulananStore.ukuran_penyimpanan_tps?.toString() ?? "",
       //   catatanlimbahcair: laporanBulananStore.catatan?.toString() ?? "",
       // });
-      setForm({
-        ...form,
+      // Create new form object with store data
+      const editFormData = {
         oldid: laporanBulananStore.id_laporan_bulanan?.toString() ?? "",
         periode: laporanBulananStore.periode?.toString() ?? "",
         tahun: laporanBulananStore.tahun?.toString() ?? "",
@@ -546,15 +546,12 @@ const FormPengajuanLimbah: React.FC = () => {
           laporanBulananStore.berat_limbah_total?.toString() ?? "",
         limbah_b3_covid: laporanBulananStore.limbah_b3_covid?.toString() ?? "",
         limbah_b3_nonmedis: laporanBulananStore.limbah_b3_nonmedis?.toString() ?? "",
-        debit_limbah_cair:
-          laporanBulananStore.debit_limbah_cair?.toString() ?? "",
+        limbah_cair_b3: laporanBulananStore.limbah_cair_b3?.toString() ?? "",
         catatan: laporanBulananStore.catatan?.toString() ?? "",
         link_input_manifest:
           laporanBulananStore.link_input_manifest?.toString() ?? "",
         link_input_logbook:
           laporanBulananStore.link_input_logbook?.toString() ?? "",
-        link_input_lab_ipal:
-          laporanBulananStore.link_input_lab_ipal?.toString() ?? "",
         link_input_lab_lain:
           laporanBulananStore.link_input_lab_lain?.toString() ?? "",
         link_input_dokumen_lingkungan_rs:
@@ -565,46 +562,12 @@ const FormPengajuanLimbah: React.FC = () => {
         link_input_ujilab_cair:
           laporanBulananStore.link_input_ujilab_cair?.toString() ?? "",
         limbah_jarum: laporanBulananStore.limbah_jarum?.toString() ?? "",
-        limbah_sludge_ipal:
-          laporanBulananStore.limbah_sludge_ipal?.toString() ?? "",
         limbah_padat_infeksius:
           laporanBulananStore.limbah_padat_infeksius?.toString() ?? "",
-
-        // namatransporter: laporanBulananStore.nama_transporter?.toString() ?? "",
-        // namapemusnah: laporanBulananStore.nama_pemusnah?.toString() ?? "",
-        // metodepemusnah: laporanBulananStore.metode_pemusnah?.toString() ?? "",
-        // berat_limbah_total: parseInt(
-        //   laporanBulananStore.berat_limbah_total?.toString() ?? ""
-        // ),
-        // totallimbahcovid: parseInt(
-        //   laporanBulananStore.limbah_b3_covid?.toString() ?? ""
-        // ),
-        // totallimbahnoncovid: parseInt(
-        //   laporanBulananStore.limbah_b3_noncovid?.toString() ?? ""
-        // ),
-        // debitlimbahcair:
-        //   laporanBulananStore.debit_limbah_cair?.toString() ?? "",
-        // kapasitasinpal: laporanBulananStore.kapasitas_ipal?.toString() ?? "",
-
-        // statustps:
-        //   laporanBulananStore.punya_penyimpanan_tps &&
-        //   [1, "1"].includes(laporanBulananStore.punya_penyimpanan_tps)
-        //     ? 1
-        //     : 0,
-        // ukurantps: laporanBulananStore.ukuran_penyimpanan_tps?.toString() || "",
-        // statuspemusnah:
-        //   laporanBulananStore.punya_pemusnahan_sendiri &&
-        //   [1, "1"].includes(laporanBulananStore.punya_pemusnahan_sendiri)
-        //     ? 1
-        //     : 0,
-        // ukuranpemusnah:
-        //   laporanBulananStore.ukuran_pemusnahan_sendiri?.toString() || "",
-        // stastuslimbahcair:
-        //   laporanBulananStore.memenuhi_syarat &&
-        //   [1, "1"].includes(laporanBulananStore.memenuhi_syarat)
-        //     ? 1
-        //     : 0,
-      });
+      };
+      
+      console.log("Edit form data from store:", editFormData);
+      setForm(editFormData);
 
       setIsCheckboxChecked(
         laporanBulananStore.punya_penyimpanan_tps &&
@@ -619,7 +582,7 @@ const FormPengajuanLimbah: React.FC = () => {
           : false
       );
 
-      formInstance.setFieldsValue({
+      const formFieldsData = {
         form_periode: laporanBulananStore.periode?.toString() ?? "",
         form_tahun: laporanBulananStore.tahun?.toString() ?? "",
         form_transporter: laporanBulananStore.id_transporter?.toString() ?? "",
@@ -629,22 +592,15 @@ const FormPengajuanLimbah: React.FC = () => {
           laporanBulananStore.limbah_b3_nonmedis?.toString() ?? "",
         form_beratLimbahCovid:
           laporanBulananStore.limbah_b3_covid?.toString() ?? "",
-
         form_beratLimbahJarum:
           laporanBulananStore.limbah_jarum?.toString() ?? "",
-        form_beratLimbahSludgeIPAL:
-          laporanBulananStore.limbah_sludge_ipal?.toString() ?? "",
-        form_beratLimbahPadatInfeksius:
-          laporanBulananStore.limbah_padat_infeksius?.toString() ?? "",
-        form_debitLimbah:
-          laporanBulananStore.debit_limbah_cair?.toString() ?? "",
+        form_beratLimbahCairB3:
+          laporanBulananStore.limbah_cair_b3?.toString() ?? "",
         form_catatan: laporanBulananStore.catatan?.toString() ?? "",
         form_link_input_manifest:
           laporanBulananStore.link_input_manifest?.toString() ?? "",
         form_link_input_logbook:
           laporanBulananStore.link_input_logbook?.toString() ?? "",
-        form_link_input_lab_ipal:
-          laporanBulananStore.link_input_lab_ipal?.toString() ?? "",
         form_link_input_lab_lain:
           laporanBulananStore.link_input_lab_lain?.toString() ?? "",
         form_link_input_dokumen_lingkungan_rs:
@@ -654,15 +610,27 @@ const FormPengajuanLimbah: React.FC = () => {
           laporanBulananStore.link_input_swa_pantau?.toString() ?? "",
         form_link_input_ujilab_cair:
           laporanBulananStore.link_input_ujilab_cair?.toString() ?? "",
-        form_limbah_b3_nonmedis:
-          laporanBulananStore.limbah_b3_nonmedis?.toString() ?? "",
+      };
 
-        form_limbah_jarum: laporanBulananStore.limbah_jarum?.toString() ?? "",
-        form_limbah_sludge_ipal:
-          laporanBulananStore.limbah_sludge_ipal?.toString() ?? "",
-        form_limbah_padat_infeksius:
-          laporanBulananStore.limbah_padat_infeksius?.toString() ?? "",
-      });
+      formInstance.setFieldsValue(formFieldsData);
+      
+      console.log("Edit form data from store:", formFieldsData);
+      setForm(editFormData);
+
+      setIsCheckboxChecked(
+        laporanBulananStore.punya_penyimpanan_tps &&
+          [1, "1"].includes(laporanBulananStore.punya_penyimpanan_tps)
+          ? true
+          : false
+      );
+      setIsCheckboxChecked1(
+        laporanBulananStore.punya_pemusnahan_sendiri &&
+          [1, "1"].includes(laporanBulananStore.punya_pemusnahan_sendiri)
+          ? true
+          : false
+      );
+
+      formInstance.setFieldsValue(editFormData);
 
       // getFile(pengajuanTransporterStore.files);
       // getFilesManifest();
@@ -721,7 +689,7 @@ const FormPengajuanLimbah: React.FC = () => {
 
         <Form.Item
           name="form_beratLimbahPadatInfeksius"
-          label="Total Limbah Padat Infeksius"
+          label="Total Limbah B3 Infeksius"
           rules={[]}
         >
           <InputNumber
@@ -768,7 +736,7 @@ const FormPengajuanLimbah: React.FC = () => {
         </Form.Item>
         <Form.Item
           name="form_beratLimbahNonMedis"
-          label="Total Limbah Padat Non Infeksius"
+          label="Total Limbah B3 Non Infeksius"
           rules={[]}
         >
           <InputNumber
@@ -799,14 +767,15 @@ const FormPengajuanLimbah: React.FC = () => {
           {"    "}
           Kg
         </Form.Item>
+        
         <Form.Item
-          name="form_beratLimbahSludgeIPAL"
-          label="Total Limbah Sludge IPAL"
+          name="form_beratLimbahCairB3"
+          label="Total Limbah Cair B3"
           rules={[]}
         >
           <InputNumber
-            onChange={(v) => handleChangeSelect(v, "limbah_sludge_ipal", event)}
-            value={form.limbah_sludge_ipal}
+            onChange={(v) => handleChangeSelect(v, "limbah_cair_b3", event)}
+            value={form.limbah_cair_b3}
             style={inputNumberStyles}
             min={0.0}
             defaultValue={0.0}
@@ -815,20 +784,10 @@ const FormPengajuanLimbah: React.FC = () => {
           {"    "}
           Kg
         </Form.Item>
-        <Form.Item name="form_debitLimbah" label="Total Limbah Cair" rules={[]}>
-          <InputNumber
-            onChange={(v) => handleChangeSelect(v, "debit_limbah_cair", event)}
-            value={form.debit_limbah_cair}
-            style={inputNumberStyles}
-            min={0.0}
-            defaultValue={0.0}
-            step={0.1}
-          />
-          {"    "}Kg
-        </Form.Item>
+
         <Form.Item
           name="form_beratLimbah"
-          label="Total Limbah Padat"
+          label="Total Limbah B3"
           rules={[]}
         >
           <InputNumber
@@ -1030,30 +989,6 @@ const FormPengajuanLimbah: React.FC = () => {
 
         <Divider />
         <h3>Upload Dokumen Tambahan</h3>
-        <Form.Item
-          name="form_link_input_lab_ipal"
-          label="Link Lab IPAL"
-          rules={[
-            {
-              required: form.link_input_lab_ipal.length < 1,
-            },
-          ]}
-        >
-          <Input
-            onChange={handleChangeInput}
-            style={inputStyles}
-            value={form.link_input_lab_ipal}
-            name="link_input_lab_ipal"
-          />
-          <Button
-            style={{ textDecoration: "underline" }}
-            onClick={() => window.open(linkUploadIpal, "_blank")}
-            icon={<ExportOutlined />}
-            type="link"
-          >
-            Klik Untuk Upload Dokumen Lab Ipal
-          </Button>
-        </Form.Item>
         <Form.Item
           name="form_link_input_lab_lain"
           label="Link Hasil Lab Lain"

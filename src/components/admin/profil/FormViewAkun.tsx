@@ -348,7 +348,7 @@ const FormTambahAkun: React.FC = () => {
       kecamatan: akunStore.kecamatan?.toString(),
       kelurahan: akunStore.kelurahan?.toString(),
       alamat_tempat: akunStore.alamat_tempat?.toString(),
-      notelp: akunStore.notlp?.toString(),
+      notelp: akunStore.nohp?.toString(),
       email: akunStore.email?.toString(),
       password: akunStore.email?.toString(),
       izin_ipal: akunStore.izin_ipal?.toString(),

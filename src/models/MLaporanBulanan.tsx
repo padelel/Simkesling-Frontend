@@ -1,5 +1,6 @@
 export interface MLaporanBulanan {
   id_laporan_bulanan?: number;
+  id_limbah_cair?: number; // Add id_limbah_cair field for limbah cair data
   id_transporter?: string;
   id_user?: string;
   nama_transporter?: string;
@@ -12,7 +13,7 @@ export interface MLaporanBulanan {
   ukuran_pemusnahan_sendiri?: string;
   limbah_b3_covid?: string;
   limbah_b3_noncovid?: string;
-  debit_limbah_cair?: string;
+  limbah_cair_b3?: string;
   kapasitas_ipal?: string;
   memenuhi_syarat?: string;
   catatan?: string;
@@ -32,7 +33,7 @@ export interface MLaporanBulanan {
   // berat_limbah_total: "";
   // limbah_b3_covid: "";
   // limbah_b3_noncovid: "";
-  // debit_limbah_cair: "";
+  // limbah_cair_b3: "";
   // catatan: "";
   link_input_manifest: string;
   link_input_logbook: string;
@@ -46,6 +47,7 @@ export interface MLaporanBulanan {
   limbah_jarum: string;
   limbah_sludge_ipal: string;
   limbah_padat_infeksius: string;
+  limbah_cair_b3: string; // Field untuk limbah cair B3
 
   simpenSementara?: Function;
 }

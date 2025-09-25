@@ -78,7 +78,7 @@ const formatDateWithDayMonthYearTime = (dateString: string) => {
   return `${dayName}, ${day} ${monthName} ${year} ${hours}:${minutes}:${seconds}`;
 };
 
-// Function to calculate time remaining with detailed format
+// Function to calculate time remaining with adaptive format
 const calculateTimeRemaining = (endDate: string) => {
   if (!endDate) return "N/A";
   
@@ -90,22 +90,35 @@ const calculateTimeRemaining = (endDate: string) => {
     return "Expired";
   }
   
-  // Calculate years, months, days, hours, and minutes
+  // Calculate all time units
   const years = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 365));
   const months = Math.floor((diffTime % (1000 * 60 * 60 * 24 * 365)) / (1000 * 60 * 60 * 24 * 30));
   const days = Math.floor((diffTime % (1000 * 60 * 60 * 24 * 30)) / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diffTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
   const minutes = Math.floor((diffTime % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diffTime % (1000 * 60)) / 1000);
   
-  const parts = [];
-  
-  if (years > 0) parts.push(`${years} tahun`);
-  if (months > 0) parts.push(`${months} bulan`);
-  if (days > 0) parts.push(`${days} hari`);
-  if (hours > 0) parts.push(`${hours} jam`);
-  if (minutes > 0) parts.push(`${minutes} menit`);
-  
-  return parts.length > 0 ? parts.join(" ") : "Kurang dari 1 menit";
+  // Adaptive format based on time remaining
+  if (years >= 1) {
+    // Show years and months for >= 1 year, but if months is 0, show years and days
+    if (months > 0) {
+      return `${years} tahun ${months} bulan`;
+    } else {
+      return `${years} tahun ${days} hari`;
+    }
+  } else if (months >= 1) {
+    // Show months and days for >= 1 month but < 1 year
+    return `${months} bulan ${days} hari`;
+  } else if (days >= 1) {
+    // Show days and hours for >= 1 day but < 1 month
+    return `${days} hari ${hours} jam`;
+  } else if (hours >= 1) {
+    // Show hours and minutes for >= 1 hour but < 1 day
+    return `${hours} jam ${minutes} menit`;
+  } else {
+    // Show minutes and seconds for < 1 hour
+    return `${minutes} menit ${seconds} detik`;
+  }
 };
 
 type NotificationType = "success" | "info" | "warning" | "error";

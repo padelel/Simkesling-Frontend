@@ -106,12 +106,33 @@ const Index: React.FC = () => {
   const globalStore = useGlobalStore();
   const router = useRouter();
 
+  // Fungsi untuk mengurutkan bulan secara kronologis
+  const getMonthOrder = (monthName: string): number => {
+    const months = [
+      'januari', 'februari', 'maret', 'april', 'mei', 'juni',
+      'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
+    ];
+    return months.indexOf(monthName.toLowerCase());
+  };
+
+  const sortPeriode = (a: any, b: any) => {
+    const monthOrderA = getMonthOrder(a.periode_nama);
+    const monthOrderB = getMonthOrder(b.periode_nama);
+    
+    // Jika bulan tidak ditemukan, letakkan di akhir
+    if (monthOrderA === -1 && monthOrderB === -1) return 0;
+    if (monthOrderA === -1) return 1;
+    if (monthOrderB === -1) return -1;
+    
+    return monthOrderA - monthOrderB;
+  };
+
   const columns: ColumnsType<DataType> = [
     {
       title: "Periode (Bulan)",
       dataIndex: "periode_nama",
-      // defaultSortOrder: "descend",
-      // sorter: (a: any, b: any) => a.periode_nama - b.periode_nama,
+      defaultSortOrder: "ascend",
+      sorter: sortPeriode,
     },
     {
       title: "Tahun",
@@ -156,13 +177,13 @@ const Index: React.FC = () => {
         const toFormPage = (param: MLaporanBulanan) => {
           if (laporanBulananStore.simpenSementara) {
             laporanBulananStore.simpenSementara(param);
-            router.push("/dashboard/user/limbah/PageTambahLimbah?action=edit");
+            router.push("/dashboard/user/limbah-padat/PageTambahLimbah?action=edit");
           }
         };
         const toViewPage = (param: MLaporanBulanan) => {
           if (laporanBulananStore.simpenSementara) {
             laporanBulananStore.simpenSementara(param);
-            router.push("/dashboard/user/limbah/PageViewLimbah?action=view");
+            router.push("/dashboard/user/limbah-padat/PageViewLimbah?action=view");
           }
         };
         return (
@@ -254,7 +275,7 @@ const Index: React.FC = () => {
   }, []);
 
   return (
-    <MainLayout title="Laporan Limbah">
+    <MainLayout title="Laporan Limbah B3">
       <Row justify="end">
         <Col span={6}>
           <Input
@@ -276,7 +297,7 @@ const Index: React.FC = () => {
       </Row>
       <div>
         <Link
-          href="/dashboard/user/limbah/PageTambahLimbah?action=create"
+          href="/dashboard/user/limbah-padat/PageTambahLimbah?action=create"
           passHref>
           <div style={{ display: "flex", justifyContent: "center" }}>
             <Button
@@ -284,7 +305,7 @@ const Index: React.FC = () => {
               size="large"
               icon={<PlusCircleOutlined />}
               style={{ boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)" }}>
-              Tambah Laporan Limbah
+              Tambah Laporan Limbah B3
             </Button>
           </div>
         </Link>

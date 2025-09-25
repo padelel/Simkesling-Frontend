@@ -4,6 +4,7 @@ import cloneDeep from "clone-deep";
 
 const tmpLaporanBulanan = {
   id_laporan_bulanan: 0,
+  id_limbah_cair: 0, // Add id_limbah_cair field for limbah cair data
   id_transporter: "",
   id_user: "",
   nama_transporter: "",
@@ -16,7 +17,7 @@ const tmpLaporanBulanan = {
   ukuran_pemusnahan_sendiri: "",
   limbah_b3_covid: "",
   limbah_b3_noncovid: "",
-  debit_limbah_cair: "",
+  limbah_cair_b3: "",
   kapasitas_ipal: "",
   memenuhi_syarat: "",
   catatan: "",
@@ -37,7 +38,7 @@ const tmpLaporanBulanan = {
   // berat_limbah_total: "",
   // limbah_b3_covid: "",
   // limbah_b3_noncovid: "",
-  // debit_limbah_cair: "",
+  // limbah_cair_b3: "",
   // catatan: "",
   link_input_manifest: "",
   link_input_logbook: "",
@@ -51,6 +52,7 @@ const tmpLaporanBulanan = {
   limbah_jarum: "",
   limbah_sludge_ipal: "",
   limbah_padat_infeksius: "",
+  limbah_cair_b3: "", // Field untuk limbah cair B3
 };
 
 export const useLaporanBulananStore = create<MLaporanBulanan>((set) => ({

@@ -21,6 +21,49 @@ import { parsingDate } from "@/utils/common";
 import cloneDeep from "clone-deep";
 import { CSVLink } from "react-csv";
 
+// Function to calculate time remaining with adaptive format
+const calculateTimeRemaining = (endDate: string) => {
+  if (!endDate) return "N/A";
+  
+  const now = new Date();
+  const end = new Date(endDate);
+  const diffTime = end.getTime() - now.getTime();
+  
+  if (diffTime <= 0) {
+    return "Expired";
+  }
+  
+  // Calculate all time units
+  const years = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 365));
+  const months = Math.floor((diffTime % (1000 * 60 * 60 * 24 * 365)) / (1000 * 60 * 60 * 24 * 30));
+  const days = Math.floor((diffTime % (1000 * 60 * 60 * 24 * 30)) / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diffTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diffTime % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diffTime % (1000 * 60)) / 1000);
+  
+  // Adaptive format based on time remaining
+  if (years >= 1) {
+    // Show years and months for >= 1 year, but if months is 0, show years and days
+    if (months > 0) {
+      return `${years} tahun ${months} bulan`;
+    } else {
+      return `${years} tahun ${days} hari`;
+    }
+  } else if (months >= 1) {
+    // Show months and days for >= 1 month but < 1 year
+    return `${months} bulan ${days} hari`;
+  } else if (days >= 1) {
+    // Show days and hours for >= 1 day but < 1 month
+    return `${days} hari ${hours} jam`;
+  } else if (hours >= 1) {
+    // Show hours and minutes for >= 1 hour but < 1 day
+    return `${hours} jam ${minutes} menit`;
+  } else {
+    // Show minutes and seconds for < 1 hour
+    return `${minutes} menit ${seconds} detik`;
+  }
+};
+
 // Add CSS for group rows
 const groupRowStyles = `
   .group-row {
@@ -124,10 +167,26 @@ const Index: React.FC = () => {
     },
 
     {
-      title: "Masa Berlaku MOU",
+      title: "Sisa Masa Berlaku MOU",
       dataIndex: "masaBerlakuBerakhir",
-      // defaultSortOrder: "descend",
-      // sorter: (a: any, b: any) => a.namaTempat.length - b.namaTempat.length,
+      render: (_: any, record: any) => {
+        if (record.isGroup) return '';
+        const timeRemaining = calculateTimeRemaining(record.masaBerlakuBerakhir);
+        let color = "green";
+        
+        if (timeRemaining === "Expired") {
+          color = "red";
+        } else if (timeRemaining.includes("hari") && !timeRemaining.includes("bulan") && !timeRemaining.includes("tahun")) {
+          const days = parseInt(timeRemaining.split(" ")[0]);
+          if (days <= 30) {
+            color = "orange";
+          }
+        }
+        
+        return (
+          <Tag color={color}>{timeRemaining}</Tag>
+        );
+      },
     },
     {
       title: "Status MOU",

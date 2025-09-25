@@ -155,7 +155,6 @@ const FormViewLaporan: React.FC = () => {
     limbah_padat_infeksius: "",
     limbah_jarum: "",
     sludge_ipal: "",
-    debit_limbah_cair: "",
     catatan: "",
     link_input_manifest: "",
     link_input_logbook: "",
@@ -464,12 +463,24 @@ const FormViewLaporan: React.FC = () => {
 
   useLayoutEffect(() => {
     let token = localStorage.getItem("token");
-    let user: any = jwtDecode(token ?? "");
-    if (!user) {
+    if (!token) {
       router.push("/");
       return;
     }
-    console.log(user);
+    
+    let user: any = null;
+    try {
+      user = jwtDecode(token);
+      if (!user) {
+        router.push("/");
+        return;
+      }
+      console.log(user);
+    } catch (error) {
+      console.error('Invalid token:', error);
+      router.push("/");
+      return;
+    }
 
     try {
       getTransporterData();
@@ -494,8 +505,9 @@ const FormViewLaporan: React.FC = () => {
 
       console.log("masuk sini? #1");
       if (
-        laporanBulananStore.id_laporan_bulanan == null ||
-        laporanBulananStore.id_laporan_bulanan == 0
+        (laporanBulananStore.id_laporan_bulanan == null ||
+        laporanBulananStore.id_laporan_bulanan == 0) &&
+        !router.asPath.includes("ViewLaporan")
       ) {
         console.log("masuk sini? #2");
         if (user.level == "1") {
@@ -535,9 +547,8 @@ const FormViewLaporan: React.FC = () => {
       limbah_b3_nonmedis: laporanBulananStore.limbah_b3_nonmedis?.toString() ?? "",
         limbah_padat_infeksius: laporanBulananStore.limbah_padat_infeksius?.toString() ?? "",
         limbah_jarum: laporanBulananStore.limbah_jarum?.toString() ?? "",
+        limbah_cair_b3: laporanBulananStore.limbah_cair_b3?.toString() ?? "",
         sludge_ipal: laporanBulananStore.limbah_sludge_ipal?.toString() ?? "",
-        debit_limbah_cair:
-          laporanBulananStore.debit_limbah_cair?.toString() ?? "",
         catatan: laporanBulananStore.catatan?.toString() ?? "",
         link_input_manifest:
           laporanBulananStore.link_input_manifest?.toString() ?? "",
@@ -582,14 +593,12 @@ const FormViewLaporan: React.FC = () => {
         form_beratLimbahPadatInfeksius:
           laporanBulananStore.limbah_padat_infeksius?.toString() ?? "",
         form_debitLimbah:
-          laporanBulananStore.debit_limbah_cair?.toString() ?? "",
+          laporanBulananStore.limbah_cair_b3?.toString() ?? "",
         form_catatan: laporanBulananStore.catatan?.toString() ?? "",
         form_link_input_manifest:
           laporanBulananStore.link_input_manifest?.toString() ?? "",
         form_link_input_logbook:
           laporanBulananStore.link_input_logbook?.toString() ?? "",
-        form_link_input_lab_ipal:
-          laporanBulananStore.link_input_lab_ipal?.toString() ?? "",
         form_link_input_lab_lain:
           laporanBulananStore.link_input_lab_lain?.toString() ?? "",
         form_link_input_dokumen_lingkungan_rs:
@@ -609,10 +618,12 @@ const FormViewLaporan: React.FC = () => {
       getListHere();
     } catch (error) {
       console.error(error);
-      if (user.level == "1") {
-        router.push("/dashboard/admin/manajemen/laporan");
-      } else {
-        router.push("/dashboard/user/limbah");
+      if (!router.asPath.includes("ViewLaporan")) {
+        if (user.level == "1") {
+          router.push("/dashboard/admin/manajemen/laporan");
+        } else {
+          router.push("/dashboard/user/limbah");
+        }
       }
       // router.push("/dashboard/user/limbah");
     }
@@ -631,7 +642,7 @@ const FormViewLaporan: React.FC = () => {
               </tr>
 
               <tr>
-                <td>Total Limbah Padat Infeksius (Kg)</td>
+                <td>Total Limbah B3 Infeksius (Kg)</td>
                 <td>:</td>
                 <td>{form.limbah_padat_infeksius}</td>
               </tr>
@@ -641,28 +652,24 @@ const FormViewLaporan: React.FC = () => {
                 <td>{form.limbah_b3_covid}</td>
               </tr>
                 <tr>
-                  <td>Total Limbah Padat Non Infeksius (Kg)</td>
+                  <td>Total Limbah B3 Non Infeksius (Kg)</td>
                   <td>:</td>
                   <td>{form.limbah_b3_nonmedis}</td>
                 </tr>
                 <tr>
-                  <td>Total Limbah Jarum (Kg)</td>
-                  <td>:</td>
-                  <td>{form.limbah_jarum}</td>
-                </tr>
-              <tr>
-                <td>Total Sludge IPAL (Kg)</td>
+                <td>Total Limbah Jarum (Kg)</td>
                 <td>:</td>
-                <td>{form.sludge_ipal}</td>
-              </tr>
-              <tr>
-                <td>Debit Limbah Cair (L)</td>
-                <td>:</td>
-                <td>{form.debit_limbah_cair}</td>
+                <td>{form.limbah_jarum}</td>
               </tr>
 
               <tr>
-                <td><strong>Total Limbah Padat (Kg)</strong></td>
+                <td>Total Limbah Cair B3 (Kg)</td>
+                <td>:</td>
+                <td>{form.limbah_cair_b3}</td>
+              </tr>
+
+              <tr>
+                <td><strong>Total Limbah B3 (Kg)</strong></td>
                 <td>:</td>
                 <td><strong>{form.berat_limbah_total}</strong></td>
               </tr>
@@ -746,7 +753,7 @@ const FormViewLaporan: React.FC = () => {
                 </td>
               </tr>
 
-              <tr>
+              {/* <tr>
                 <td>Link Ipal</td>
                 <td>:</td>
                 <td>
@@ -759,7 +766,7 @@ const FormViewLaporan: React.FC = () => {
                     <b>{"  "}Dokumen Lab Ipal</b>
                   </a>
                 </td>
-              </tr>
+              </tr> */}
               <tr>
                 <td>Link Lab lain</td>
                 <td>:</td>

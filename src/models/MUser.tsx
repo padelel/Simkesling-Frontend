@@ -48,6 +48,7 @@ export interface User {
   link2: string;
   link3: string;
   kapasitas_ipal: string;
+  kapasitas_ipal_option: string;
   link_input_izin_ipal: string;
   link_input_izin_tps: string;
   link_input_dokumen_lingkungan_rs: string;

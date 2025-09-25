@@ -4,7 +4,7 @@ import React from "react";
 
 const PageTambahLimbah = () => {
   return (
-    <MainLayout title="Form Laporan Limbah">
+    <MainLayout title="Form Laporan Limbah B3">
       <FormPengajuanLimbah />
     </MainLayout>
   );

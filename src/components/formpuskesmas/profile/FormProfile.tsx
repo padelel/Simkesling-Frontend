@@ -8,6 +8,8 @@ import {
   UploadFile,
   UploadProps,
   message,
+  Radio,
+  InputNumber,
 } from "antd";
 
 import { UploadOutlined, CheckCircleOutlined } from "@ant-design/icons";
@@ -65,13 +67,7 @@ const FormProfile = () => {
     username: "",
     password: "",
     oldid: "",
-    link_manifest: "",
-    link_logbook: "",
-    link_lab_ipal: "",
-    link_lab_lain: "",
     link_dokumen_lingkungan_rs: "",
-    link_izin_transporter: "",
-    link_mou_transporter: "",
     link_swa_pantau: "",
     link_lab_limbah_cair: "",
     link_izin_ipal: "",
@@ -82,9 +78,16 @@ const FormProfile = () => {
     link2: "",
     link3: "",
     kapasitas_ipal: "",
+    kapasitas_ipal_option: "ada", // "ada" or "tidak_ada"
     link_input_izin_ipal: "",
     link_input_izin_tps: "",
     link_input_dokumen_lingkungan_rs: "",
+    link_manifest: "",
+    link_logbook: "",
+    link_lab_ipal: "",
+    link_lab_lain: "",
+    link_izin_transporter: "",
+    link_mou_transporter: "",
   };
   const [form, setForm] = useState(tmpForm);
 
@@ -182,35 +185,35 @@ const FormProfile = () => {
     dataForm.append("id_kecamatan", form.id_kecamatan);
     dataForm.append("id_kelurahan", form.id_kelurahan);
     dataForm.append("alamat_tempat", form.alamat);
-    dataForm.append("notlp", form.telp);
+    dataForm.append("nohp", form.telp);
     dataForm.append("email", form.email);
-    dataForm.append("link_manifest", form.link_manifest);
-    dataForm.append("link_logbook", form.link_logbook);
-    dataForm.append("link_lab_ipal", form.link_lab_ipal);
-    dataForm.append("link_lab_lain", form.link_lab_lain);
     dataForm.append(
       "link_dokumen_lingkungan_rs",
       form.link_dokumen_lingkungan_rs
     );
-    dataForm.append("link_izin_transporter", form.link_izin_transporter);
-    dataForm.append("link_mou_transporter", form.link_mou_transporter);
     dataForm.append("link_swa_pantau", form.link_swa_pantau);
     dataForm.append("link_lab_limbah_cair", form.link_lab_limbah_cair);
     dataForm.append("link_izin_ipal", form.link_izin_ipal);
     dataForm.append("link_izin_tps", form.link_izin_tps);
     dataForm.append("link_ukl", form.link_ukl);
     dataForm.append("link_upl", form.link_upl);
-    dataForm.append("link_izin_tps", form.link_izin_tps);
     dataForm.append("link1", form.link1);
     dataForm.append("link2", form.link2);
     dataForm.append("link3", form.link3);
     dataForm.append("kapasitas_ipal", form.kapasitas_ipal);
+    dataForm.append("kapasitas_ipal_option", form.kapasitas_ipal_option);
     dataForm.append("link_input_izin_ipal", form.link_input_izin_ipal);
     dataForm.append("link_input_izin_tps", form.link_input_izin_tps);
     dataForm.append(
       "link_input_dokumen_lingkungan_rs",
       form.link_input_dokumen_lingkungan_rs
     );
+    dataForm.append("link_manifest", form.link_manifest);
+    dataForm.append("link_logbook", form.link_logbook);
+    dataForm.append("link_lab_ipal", form.link_lab_ipal);
+    dataForm.append("link_lab_lain", form.link_lab_lain);
+    dataForm.append("link_izin_transporter", form.link_izin_transporter);
+    dataForm.append("link_mou_transporter", form.link_mou_transporter);
 
     if (fileTps.length > 0) {
       let file = fileTps[0];
@@ -261,15 +264,9 @@ const FormProfile = () => {
       id_kecamatan: user?.id_kecamatan?.toString() ?? "",
       id_kelurahan: user?.id_kelurahan?.toString() ?? "",
       alamat: user?.alamat_tempat ?? "",
-      telp: user?.notlp ?? "",
+      telp: user?.nohp ?? "",
       email: user?.email ?? "",
-      link_manifest: user?.link_manifest ?? "",
-      link_logbook: user?.link_logbook ?? "",
-      link_lab_ipal: user?.link_lab_ipal ?? "",
-      link_lab_lain: user?.link_lab_lain ?? "",
       link_dokumen_lingkungan_rs: user?.link_dokumen_lingkungan_rs ?? "",
-      link_izin_transporter: user?.link_izin_transporter ?? "",
-      link_mou_transporter: user?.link_mou_transporter ?? "",
       link_swa_pantau: user?.link_swa_pantau ?? "",
       link_lab_limbah_cair: user?.link_lab_limbah_cair ?? "",
       link_izin_ipal: user?.link_izin_ipal ?? "",
@@ -280,10 +277,17 @@ const FormProfile = () => {
       link2: user?.link2 ?? "",
       link3: user?.link3 ?? "",
       kapasitas_ipal: user?.kapasitas_ipal ?? "",
+      kapasitas_ipal_option: user?.kapasitas_ipal_option ?? (user?.kapasitas_ipal === "Tidak ada pemeriksaan" ? "tidak_ada" : "ada"),
       link_input_izin_ipal: user?.link_input_izin_ipal ?? "",
       link_input_izin_tps: user?.link_input_izin_tps ?? "",
       link_input_dokumen_lingkungan_rs:
         user?.link_input_dokumen_lingkungan_rs ?? "",
+      link_manifest: user?.link_manifest ?? "",
+      link_logbook: user?.link_logbook ?? "",
+      link_lab_ipal: user?.link_lab_ipal ?? "",
+      link_lab_lain: user?.link_lab_lain ?? "",
+      link_izin_transporter: user?.link_izin_transporter ?? "",
+      link_mou_transporter: user?.link_mou_transporter ?? "",
     });
     setLinkDokumenLingkunganRS(user.link_dokumen_lingkungan_rs);
     formInstance.setFieldsValue({
@@ -294,13 +298,20 @@ const FormProfile = () => {
       form_kecamatan: user?.id_kecamatan?.toString() ?? "",
       form_kelurahan: user?.id_kelurahan?.toString() ?? "",
       form_alamat: user?.alamat_tempat ?? "",
-      form_notelp: user?.notlp ?? "",
+      form_notelp: user?.nohp ?? "",
       form_email: user?.email ?? "",
       form_kapasitasIpal: user?.kapasitas_ipal ?? "",
+      form_kapasitasIpal_option: user?.kapasitas_ipal_option ?? (user?.kapasitas_ipal === "Tidak ada pemeriksaan" ? "tidak_ada" : "ada"),
       form_inputLinkIzinIpal: user?.link_input_izin_ipal ?? "",
       form_inputLinkIzinTps: user?.link_input_izin_tps ?? "",
       form_link_input_dokumen_lingkungan_rs:
         user?.link_input_dokumen_lingkungan_rs ?? "",
+      form_link_manifest: user?.link_manifest ?? "",
+      form_link_logbook: user?.link_logbook ?? "",
+      form_link_lab_ipal: user?.link_lab_ipal ?? "",
+      form_link_lab_lain: user?.link_lab_lain ?? "",
+      form_link_izin_transporter: user?.link_izin_transporter ?? "",
+      form_link_mou_transporter: user?.link_mou_transporter ?? "",
     });
     let id_kec = user?.id_kecamatan ?? 0;
     getKelurahanData(parseInt(id_kec.toString()));
@@ -410,19 +421,6 @@ const FormProfile = () => {
             />
           </Form.Item>
           <Form.Item
-            name="form_alamat"
-            label="Alamat"
-            rules={[{ required: true }]}>
-            <TextArea
-              name="alamat"
-              showCount
-              maxLength={300}
-              onChange={handleChangeInput}
-              value={form.alamat}
-              style={inputStyles}
-            />
-          </Form.Item>
-          <Form.Item
             name="form_notelp"
             label="Nomor Telepon"
             rules={[{ required: true }]}>
@@ -445,23 +443,55 @@ const FormProfile = () => {
             />
           </Form.Item>
           <Form.Item
-            name="form_kapasitasIpal"
-            label="Kapasitas Ipal"
-            rules={[{ required: true }]}>
-            <Input
-              onChange={handleChangeInput}
-              value={form.kapasitas_ipal}
-              name="kapasitas_ipal"
-              style={inputStyles}
-            />
+            name="form_kapasitasIpal_option"
+            label="Kapasitas IPAL"
+            rules={[{ required: true }]}
+          >
+            <Radio.Group
+              value={form.kapasitas_ipal_option}
+              onChange={(e) => {
+                const value = e.target.value;
+                setForm({
+                  ...form,
+                  kapasitas_ipal_option: value,
+                  kapasitas_ipal: value === "tidak_ada" ? "Tidak ada pemeriksaan" : "",
+                });
+              }}
+            >
+              <Radio value="ada">Ada pemeriksaan</Radio>
+              <Radio value="tidak_ada">Tidak ada pemeriksaan</Radio>
+            </Radio.Group>
           </Form.Item>
+
+          {form.kapasitas_ipal_option === "ada" && (
+            <Form.Item
+              name="form_kapasitasIpal"
+              label="Nilai Kapasitas IPAL (m³)"
+              rules={[{ required: true, message: "Masukkan nilai kapasitas IPAL" }]}
+            >
+              <InputNumber
+                onChange={(value) => {
+                  setForm({
+                    ...form,
+                    kapasitas_ipal: value?.toString() || "",
+                  });
+                }}
+                value={form.kapasitas_ipal ? parseFloat(form.kapasitas_ipal) : undefined}
+                style={{ width: "100%" }}
+                placeholder="Masukkan nilai kapasitas dalam m³"
+                min={0}
+                step={0.1}
+                addonAfter="m³"
+              />
+            </Form.Item>
+          )}
           <Form.Item
             name="form_link_input_dokumen_lingkungan_rs"
             label="Link Dokumen Lingkungan"
             rules={[
               {
                 required: form.link_input_dokumen_lingkungan_rs.length < 1,
-                message: "Masukan Link Izin Transporter",
+                message: "Masukan Link Dokumen Lingkungan",
               },
             ]}>
             <Input
@@ -477,6 +507,132 @@ const FormProfile = () => {
               onClick={() => window.open(linkDokumenLingkunganRS, "_blank")}>
               Klik Untuk Upload Dokumen Lingkungan RS
             </Button>
+          </Form.Item>
+
+          <Form.Item
+            name="form_link_manifest"
+            label="Link Manifest"
+            rules={[
+              {
+                required: true,
+                message: "Link manifest wajib diisi.",
+              },
+            ]}>
+            <Input
+              style={inputStyles}
+              onChange={handleChangeInput}
+              value={form.link_manifest}
+              name="link_manifest"
+              placeholder="Masukkan link manifest"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="form_link_logbook"
+            label="Link Logbook"
+            rules={[
+              {
+                required: true,
+                message: "Link logbook wajib diisi.",
+              },
+            ]}>
+            <Input
+              style={inputStyles}
+              onChange={handleChangeInput}
+              value={form.link_logbook}
+              name="link_logbook"
+              placeholder="Masukkan link logbook"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="form_link_lab_ipal"
+            label="Link Lab IPAL"
+            rules={[
+              {
+                required: true,
+                message: "Link lab IPAL wajib diisi.",
+              },
+            ]}>
+            <Input
+              style={inputStyles}
+              onChange={handleChangeInput}
+              value={form.link_lab_ipal}
+              name="link_lab_ipal"
+              placeholder="Masukkan link lab IPAL"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="form_link_lab_lain"
+            label="Link Lab Lain"
+            rules={[
+              {
+                required: true,
+                message: "Link lab lain wajib diisi.",
+              },
+            ]}>
+            <Input
+              style={inputStyles}
+              onChange={handleChangeInput}
+              value={form.link_lab_lain}
+              name="link_lab_lain"
+              placeholder="Masukkan link lab lain"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="form_link_izin_tps"
+            label="Link Izin TPS"
+            rules={[
+              {
+                required: true,
+                message: "Link izin TPS wajib diisi.",
+              },
+            ]}>
+            <Input
+              style={inputStyles}
+              onChange={handleChangeInput}
+              value={form.link_izin_tps}
+              name="link_izin_tps"
+              placeholder="Masukkan link izin TPS"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="form_link_izin_transporter"
+            label="Link Izin Transporter"
+            rules={[
+              {
+                required: true,
+                message: "Link izin transporter wajib diisi.",
+              },
+            ]}>
+            <Input
+              style={inputStyles}
+              onChange={handleChangeInput}
+              value={form.link_izin_transporter}
+              name="link_izin_transporter"
+              placeholder="Masukkan link izin transporter"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="form_link_mou_transporter"
+            label="Link MOU Transporter"
+            rules={[
+              {
+                required: true,
+                message: "Link MOU transporter wajib diisi.",
+              },
+            ]}>
+            <Input
+              style={inputStyles}
+              onChange={handleChangeInput}
+              value={form.link_mou_transporter}
+              name="link_mou_transporter"
+              placeholder="Masukkan link MOU transporter"
+            />
           </Form.Item>
 
           <Form.Item {...tailLayout}>
