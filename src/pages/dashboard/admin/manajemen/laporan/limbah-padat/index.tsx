@@ -75,10 +75,6 @@ interface DataType {
   [key: string]: any;
 }
 
-const onChange = (pagination: any, filters: any, sorter: any, extra: any) => {
-  console.log("params", pagination, filters, sorter, extra);
-};
-
 const ManajemenLaporanLimbahPadatPage: React.FC = () => {
   const router = useRouter();
   const globalStore = useGlobalStore();
@@ -90,9 +86,29 @@ const ManajemenLaporanLimbahPadatPage: React.FC = () => {
   const [expandedRowKeys, setExpandedRowKeys] = useState<React.Key[]>([]);
   const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear());
   const [availableYears, setAvailableYears] = useState<number[]>([]);
+  // Add pagination state management
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(15);
   const [form, setForm] = useState<any>({
     nama_user: "",
   });
+
+  // Handle pagination, filters, and sorting changes
+  const onChange = (pagination: any, filters: any, sorter: any, extra: any) => {
+    console.log("params", pagination, filters, sorter, extra);
+    
+    // Handle pagination changes
+    if (pagination) {
+      if (pagination.current !== undefined) {
+        setCurrentPage(pagination.current);
+      }
+      if (pagination.pageSize !== undefined) {
+        setPageSize(pagination.pageSize);
+        // Reset to first page when page size changes
+        setCurrentPage(1);
+      }
+    }
+  };
 
   const handleExpand = (expanded: boolean, record: DataType) => {
     const keys = [...expandedRowKeys];
@@ -138,16 +154,18 @@ const ManajemenLaporanLimbahPadatPage: React.FC = () => {
 
   // Year navigation functions
   const handlePreviousYear = () => {
-    if (currentYear > Math.min(...availableYears)) {
+    if (availableYears.length > 0 && currentYear > Math.min(...availableYears)) {
       setCurrentYear(currentYear - 1);
       setExpandedRowKeys([]); // Reset expanded rows when changing year
+      setCurrentPage(1); // Reset pagination when changing year
     }
   };
 
   const handleNextYear = () => {
-    if (currentYear < Math.max(...availableYears)) {
+    if (availableYears.length > 0 && currentYear < Math.max(...availableYears)) {
       setCurrentYear(currentYear + 1);
       setExpandedRowKeys([]); // Reset expanded rows when changing year
+      setCurrentPage(1); // Reset pagination when changing year
     }
   };
 
@@ -649,7 +667,7 @@ const ManajemenLaporanLimbahPadatPage: React.FC = () => {
             if (facilityData.length > 0) {
               const reportedMonths = getReportedMonths(facilityData);
               
-              // Add location group header
+              // Add location group header with children
               processedGroupedData[year].push({
                 key: `group-${year}-${location}`,
                 namaTempat: location,
@@ -664,15 +682,12 @@ const ManajemenLaporanLimbahPadatPage: React.FC = () => {
                 tanggalRevisi: '',
                 name: '',
                 age: 0,
-                address: ''
-              });
-              
-              // Add all items for this location
-              facilityData.forEach(item => {
-                processedGroupedData[year].push({
+                address: '',
+                children: facilityData.map(item => ({
                   ...item,
+                  key: item.key || item.id_laporan_bulanan || item.id || Math.random().toString(),
                   tahun: year // Ensure year is correctly set
-                });
+                }))
               });
             }
           });
@@ -693,6 +708,12 @@ const ManajemenLaporanLimbahPadatPage: React.FC = () => {
         setCurrentYear(years[0]);
       }
       
+      // Reset expanded rows to ensure data starts collapsed
+      setExpandedRowKeys([]);
+      
+      // Reset pagination to first page when data changes
+      setCurrentPage(1);
+      
       setDataExport(finalData);
     } catch (e) {
       console.error(e);
@@ -704,13 +725,6 @@ const ManajemenLaporanLimbahPadatPage: React.FC = () => {
   useEffect(() => {
     getData();
   }, []);
-
-  useEffect(() => {
-    // Re-process data when expanded rows change
-    if (Object.keys(groupedDataByYear).length > 0) {
-      getData();
-    }
-  }, [expandedRowKeys]);
 
   return (
     <MainLayout title="Manajemen Laporan Limbah Padat">
@@ -980,15 +994,28 @@ const ManajemenLaporanLimbahPadatPage: React.FC = () => {
                         }
                         return null;
                       },
-                      rowExpandable: (record) => record.isGroup
-                      // Remove childrenColumnName to use manual expand logic
+                      rowExpandable: (record) => record.isGroup,
+                      childrenColumnName: 'children'
                     }}
                     pagination={{
-                      pageSize: 15,
+                      current: currentPage,
+                      pageSize: pageSize,
+                      total: getCurrentYearData().length,
                       showSizeChanger: true,
                       showQuickJumper: true,
                       showTotal: (total, range) =>
                         `${range[0]}-${range[1]} dari ${total} laporan`,
+                      pageSizeOptions: ['10', '15', '20', '50', '100'],
+                      onShowSizeChange: (current, size) => {
+                        setPageSize(size);
+                        setCurrentPage(1);
+                      },
+                      onChange: (page, size) => {
+                        setCurrentPage(page);
+                        if (size !== pageSize) {
+                          setPageSize(size);
+                        }
+                      }
                     }}
                     scroll={{ x: 1200 }}
                     rowClassName={(record) => {

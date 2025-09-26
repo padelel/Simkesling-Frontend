@@ -28,7 +28,7 @@ api.interceptors.request.use(
     // Add any request transformations here, such as adding headers or modifying data
     let token = await localStorage.getItem("token");
     if (token !== null && typeof window !== "undefined") {
-      config.headers.Authorization = `${token}`;
+      config.headers.Authorization = `Bearer ${token}`;
     }
     // console.log(config)
 

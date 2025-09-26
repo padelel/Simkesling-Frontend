@@ -389,7 +389,7 @@ const FormPengajuanTransporter: React.FC = () => {
     // });
   };
   const [formInstance] = Form.useForm();
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (
       pengajuanTransporterStore.id_transporter_tmp == null ||
       pengajuanTransporterStore.id_transporter_tmp == 0
