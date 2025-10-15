@@ -65,7 +65,7 @@ const LandingPage: React.FC = () => {
               alignItems: "center",
               flexDirection: "column", // Mengubah tata letak menjadi kolom di ponsel
             }}>
-            <div style={{ width: "100%" }}>
+            {/*<div style={{ width: "100%" }}>
               <h2 style={{ color: "#fff" }}>
                 Lokasi Dinas Kesehatan Kota Depok
               </h2>
@@ -75,7 +75,7 @@ const LandingPage: React.FC = () => {
                 height="200"
                 style={{ border: "" }}
                 loading="lazy"></iframe>
-            </div>
+            </div>*/}
             <div style={{ width: "100%" }}>
               <h2 style={{ color: "#fff" }}>Kontak</h2>
               <p>

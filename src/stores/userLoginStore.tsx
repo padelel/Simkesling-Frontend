@@ -2,12 +2,21 @@ import { create } from "zustand";
 import { MUser } from "../models/MUser";
 import cloneDeep from "clone-deep";
 import api from "@/utils/HttpRequest";
-import jwt_decode from "jwt-decode";
+// import jwt_decode from "jwt-decode";
 // import { Cookie } from "next/font/google";
 import Cookies from "js-cookie";
 import Notif from "@/utils/Notif";
-import { useRouter } from "next/router";
+// import { useRouter } from "next/router";
 import { AxiosError } from "axios";
+
+interface UserLoginState {
+  user: MUser['user'];
+  token: string;
+  userLogin: (payload: { user: MUser['user'], token: string }) => void;
+  prosesLogin: (form_username?: string, form_password?: string) => Promise<MUser['user'] | null>;
+  prosesLogout: () => void;
+}
+
 const tmpUserLogin = {
   user: {
     id_user: 0,
@@ -58,57 +67,69 @@ const tmpUserLogin = {
   token: "",
 };
 
-export const useUserLoginStore = create<MUser>((set) => ({
+export const useUserLoginStore = create<UserLoginState>((set) => ({
   ...tmpUserLogin,
-  userLogin: (payload: MUser) => {
-    // kosongin dulu semua
+  userLogin: (payload) => {
     set(cloneDeep(tmpUserLogin));
-
-    // set ulang datanya dari payload
     set({ ...payload });
   },
-  prosesLogin: async (form_username: string, form_password: string) => {
-    //   let dari_form_username = "puskesmas001";
-    //   let dari_form_password = "123";
-
+  prosesLogin: async (form_username, form_password) => {
+    // Menggunakan FormData jika backend Anda memerlukannya
     let dataForm = new FormData();
-    dataForm.append("username", form_username);
-    dataForm.append("password", form_password);
+    if(form_username) dataForm.append("username", form_username);
+    if(form_password) dataForm.append("password", form_password);
 
     try {
-      let resp = await api.post("/login", dataForm);
-      const dataUser = resp.data.data as MUser;
-      const token = dataUser.token ?? "";
-      const user = dataUser.user;
-      const decodedToken: any = jwt_decode(token);
-      localStorage.setItem("token", token);
-      Cookies.set("username", form_username, { expires: 1 });
-      Cookies.set("nama_user", user?.nama_user ?? "", { expires: 1 });
-      Cookies.set("token", token, { expires: 1 });
-      Notif("success", "Success Login.!");
-      return user;
+      // Axios sudah dikonfigurasi dengan withCredentials: true
+      const resp = await api.post("/login", dataForm, {
+        headers: {
+            // Jika menggunakan FormData, biarkan browser mengatur Content-Type
+            // 'Content-Type': 'multipart/form-data',
+        }
+      });
+
+      // --- PERBAIKAN DI SINI ---
+      // Respons backend sekarang tidak berisi token, tapi data user
+      if (resp.status === 200 && resp.data.data.user) {
+        const user = resp.data.data.user as MUser['user'];
+
+        // HAPUS penyimpanan token
+        // const token = dataUser.token ?? "";
+        // localStorage.setItem("token", token);
+        // Cookies.set("token", token, { expires: 1 });
+
+        // TETAP simpan data user di localStorage untuk persistensi UI
+        localStorage.setItem("user", JSON.stringify(user));
+
+        // TETAP set cookie non-sensitif untuk kemudahan akses jika perlu
+        if(form_username) Cookies.set("username", form_username, { expires: 1 });
+        Cookies.set("nama_user", user?.nama_user ?? "", { expires: 1 });
+        
+        Notif("success", "Success Login.!");
+        return user; // Kembalikan objek user
+      }
+      
+      Notif("error", "Gagal Login.!", "Respons server tidak sesuai.");
+      return null;
+
     } catch (e: any) {
       let msg = e.toString();
-      if (e instanceof AxiosError) {
-        console.error("-- prosesLogin Axios --");
-
-        // return null;
-        // if (e && e.response?.data) {
-        // }
-        msg = e.response?.data.message.toString();
+      if (e instanceof AxiosError && e.response) {
+        msg = e.response?.data?.message?.toString() || "Terjadi kesalahan";
       }
-      console.error("-- prosesLogin --");
-      console.error(e);
+      console.error("-- prosesLogin Error --", e);
       Notif("error", "Gagal Login.!", msg);
       return null;
     }
   },
   prosesLogout: async () => {
-    await localStorage.removeItem("token");
-    await localStorage.removeItem("user");
-    await Cookies.remove("username");
-    await Cookies.remove("token");
-    await Cookies.remove("nama_user");
+    // Hapus semua data sesi dari sisi klien
+    localStorage.removeItem("token"); // Hapus sisa token lama jika ada
+    localStorage.removeItem("user");
+    Cookies.remove("username");
+    Cookies.remove("token"); // Hapus sisa token lama jika ada
+    Cookies.remove("nama_user");
     await Notif("success", "Success Logout.!");
+    window.location.href = "/"; // Redirect ke halaman utama
   },
 }));
