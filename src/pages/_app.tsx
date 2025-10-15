@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { ConfigProvider } from "antd";
+import { ConfigProvider, App as AntdApp } from "antd";
 import type { AppProps } from "next/app";
 import theme from "../themes/themeConfig";
 import { useRouter } from "next/router";
@@ -33,13 +33,15 @@ const App = ({ Component, pageProps }: AppProps) => {
 
   return (
     <ConfigProvider theme={theme}>
-      <Head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
-          rel="stylesheet"
-        />
-      </Head>
-      <Component {...pageProps} />
+      <AntdApp>
+        <Head>
+          <link
+            href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
+            rel="stylesheet"
+          />
+        </Head>
+        <Component {...pageProps} />
+      </AntdApp>
     </ConfigProvider>
   );
 };

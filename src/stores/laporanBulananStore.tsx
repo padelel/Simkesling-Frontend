@@ -53,6 +53,7 @@ const tmpLaporanBulanan = {
   limbah_sludge_ipal: "",
   limbah_padat_infeksius: "",
   limbah_cair_b3: "", // Field untuk limbah cair B3
+  debit_limbah_cair: "", // Field untuk debit limbah cair
 };
 
 export const useLaporanBulananStore = create<MLaporanBulanan>((set) => ({

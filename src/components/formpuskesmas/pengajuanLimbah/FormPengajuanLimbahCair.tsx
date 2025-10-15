@@ -13,6 +13,7 @@ import {
   UploadFile,
   UploadProps,
   message,
+  Tooltip,
 } from "antd";
 
 import cloneDeep from "clone-deep";
@@ -25,6 +26,7 @@ import {
   RightCircleOutlined,
   CheckCircleOutlined,
   ExportOutlined,
+  InfoCircleOutlined,
 } from "@ant-design/icons";
 
 import { DatePicker, Space } from "antd";
@@ -41,6 +43,26 @@ import Notif from "@/utils/Notif";
 import jwtDecode from "jwt-decode";
 
 const { RangePicker } = DatePicker;
+
+// Function to convert month name to number
+const getMonthNumberFromName = (monthName: string): number => {
+  const monthMap: { [key: string]: number } = {
+    'Januari': 1,
+    'Februari': 2,
+    'Maret': 3,
+    'April': 4,
+    'Mei': 5,
+    'Juni': 6,
+    'Juli': 7,
+    'Agustus': 8,
+    'September': 9,
+    'Oktober': 10,
+    'November': 11,
+    'Desember': 12
+  };
+  
+  return monthMap[monthName] || 0;
+};
 
 const onChange = (
   value: DatePickerProps["value"] | RangePickerProps["value"],
@@ -79,6 +101,7 @@ const FormPengajuanLimbahCair: React.FC = () => {
   const laporanBulananStore = useLaporanBulananStore();
   const [linkUploadManifest, setlinkUploadManifest] = useState("");
   const [linkUploadLogbook, setlinkLogbook] = useState("");
+  const [isEditMode, setIsEditMode] = useState(false);
   
   // State untuk dropdown transporter - DIHAPUS
   // const [transporterOptions, setTransporterOptions] = useState<
@@ -124,9 +147,16 @@ const FormPengajuanLimbahCair: React.FC = () => {
     //   const id_transporter = parseInt(val);
     //   setSelectedTransporter(id_transporter);
     // }
+    
+    // Ensure periode is stored as integer
+    let processedVal = val;
+    if (name === "periode") {
+      processedVal = parseInt(val);
+    }
+    
     setForm({
       ...form,
-      [name]: val,
+      [name]: processedVal,
     });
   };
 
@@ -165,8 +195,8 @@ const FormPengajuanLimbahCair: React.FC = () => {
       
       let dataForm: any = new FormData();
       dataForm.append("oldid", form.oldid || "");
-      dataForm.append("periode", form.periode.toString());
-      dataForm.append("tahun", form.tahun.toString());
+      dataForm.append("periode", parseInt(form.periode).toString());
+      dataForm.append("tahun", parseInt(form.tahun).toString());
       // dataForm.append("id_transporter", form.id_transporter.toString()); // DIHAPUS
       
       // Hapus logika transporter
@@ -245,16 +275,20 @@ const FormPengajuanLimbahCair: React.FC = () => {
       
       // Set kapasitas IPAL dari data user
       if (user?.kapasitas_ipal) {
-        // Jika nilai adalah "Tidak ada pemeriksaan", set ke kosong atau 0
-        const kapasitasValue = user.kapasitas_ipal === "Tidak ada pemeriksaan" ? "" : user.kapasitas_ipal;
+        // Jika nilai adalah "Tidak ada pemeriksaan", tetap tampilkan nilai tersebut
+        const kapasitasValue = user.kapasitas_ipal;
         
         setForm(prevForm => ({
           ...prevForm,
           kapasitas_ipal: kapasitasValue
         }));
         
-        // Update form instance - hanya set nilai jika bukan "Tidak ada pemeriksaan"
-        if (user.kapasitas_ipal !== "Tidak ada pemeriksaan") {
+        // Update form instance - jika "Tidak ada pemeriksaan", set sebagai string, jika tidak set sebagai number
+        if (user.kapasitas_ipal === "Tidak ada pemeriksaan") {
+          formInstance.setFieldsValue({
+            form_kapasitas_ipal: "Tidak ada pemeriksaan"
+          });
+        } else {
           formInstance.setFieldsValue({
             form_kapasitas_ipal: parseFloat(kapasitasValue) || undefined
           });
@@ -272,13 +306,32 @@ const FormPengajuanLimbahCair: React.FC = () => {
       try {
         const editData = JSON.parse(storedData);
         console.log("Edit data:", editData);
+        console.log("editData.periode:", editData.periode, "type:", typeof editData.periode);
+        console.log("editData.tahun:", editData.tahun, "type:", typeof editData.tahun);
+        
+        // Validate and parse periode and tahun
+        let parsedPeriode: number;
+        let parsedTahun: number;
+        
+        // Handle periode - could be month name string or number
+        if (typeof editData.periode === 'string') {
+          parsedPeriode = getMonthNumberFromName(editData.periode);
+        } else {
+          parsedPeriode = parseInt(editData.periode);
+        }
+        
+        // Handle tahun - should be number
+        parsedTahun = parseInt(editData.tahun);
+        
+        console.log("parsedPeriode:", parsedPeriode, "isNaN:", isNaN(parsedPeriode));
+        console.log("parsedTahun:", parsedTahun, "isNaN:", isNaN(parsedTahun));
         
         // Set form data dari edit data (kecuali kapasitas_ipal yang diambil dari user profile)
         setForm({
           ...form,
           oldid: editData.id?.toString() || "",
-          periode: editData.periode || form.periode,
-          tahun: editData.tahun || form.tahun,
+          periode: isNaN(parsedPeriode) ? form.periode : parsedPeriode,
+          tahun: isNaN(parsedTahun) ? form.tahun : parsedTahun,
           ph: editData.ph || "",
           bod: editData.bod || "",
           cod: editData.cod || "",
@@ -294,8 +347,8 @@ const FormPengajuanLimbahCair: React.FC = () => {
 
         // Set form instance values (kecuali kapasitas_ipal)
         formInstance.setFieldsValue({
-          form_periode: editData.periode || form.periode,
-          form_tahun: editData.tahun || form.tahun,
+          form_periode: isNaN(parsedPeriode) ? form.periode : parsedPeriode,
+          form_tahun: isNaN(parsedTahun) ? form.tahun : parsedTahun,
           form_ph: editData.ph || "",
           form_bod: editData.bod || "",
           form_cod: editData.cod || "",
@@ -325,6 +378,21 @@ const FormPengajuanLimbahCair: React.FC = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const action = urlParams.get("action");
     const id = urlParams.get("id");
+
+    // Set edit mode state
+    setIsEditMode(action === "edit");
+
+    // Check if this is edit mode and if edit data exists
+    if (action === "edit" && id) {
+      // Check if edit data exists in localStorage
+      const editData = localStorage.getItem('editLimbahCairData');
+      
+      if (!editData) {
+        // If no edit data found on refresh, redirect to index page
+        router.push('/dashboard/user/limbah-cair');
+        return;
+      }
+    }
 
     // Set default periode dan tahun sesuai waktu terkini
     const currentDate = new Date();
@@ -360,27 +428,51 @@ const FormPengajuanLimbahCair: React.FC = () => {
 
   const contentListNoTitle: Record<string, React.ReactNode> = {
     limbahCair: (
-      <Form
-        {...layout}
-        onFinish={handleSubmit}
-        name="control-hooks"
-        form={formInstance}
-      >
-
-        {/* HAPUS FORM ITEM TRANSPORTER */}
-        {/* <Form.Item
-          name="form_transporter"
-          label="Pilih Transporter"
-          rules={[{ required: true, message: "Silahkan pilih transporter" }]}
-        >
-          <Select
-            onChange={(v) => handleChangeSelect(v, "id_transporter", event)}
-            placeholder="Pilih Transporter"
-            style={inputStyles}
-            allowClear
-            options={transporterOptions}
-          />
-        </Form.Item> */}
+      <div>
+        {/* Periode dan Tahun */}
+        <Space wrap style={{ marginBottom: 20 }}>
+          <Form.Item
+            name="form_periode"
+            rules={[{ required: true }]}
+            label="Periode"
+          >
+            <Select
+              placeholder="Pilih Bulan Periode"
+              onChange={(v) => handleChangeSelect(v, "periode", event)}
+              style={{ width: 200 }}
+              disabled={isEditMode}
+              value={form.periode}
+              options={[
+                { value: 1, label: "Januari" },
+                { value: 2, label: "Februari" },
+                { value: 3, label: "Maret" },
+                { value: 4, label: "April" },
+                { value: 5, label: "Mei" },
+                { value: 6, label: "Juni" },
+                { value: 7, label: "Juli" },
+                { value: 8, label: "Agustus" },
+                { value: 9, label: "September" },
+                { value: 10, label: "Oktober" },
+                { value: 11, label: "November" },
+                { value: 12, label: "Desember" },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item
+            name="form_tahun"
+            label="Tahun"
+            rules={[{ required: true }]}
+          >
+            <Input
+              placeholder="Masukan Tahun"
+              onChange={handleChangeInput}
+              value={form.tahun}
+              maxLength={4}
+              name="tahun"
+              disabled={isEditMode}
+            />
+          </Form.Item>
+        </Space>
 
         <Divider>Parameter Limbah Cair</Divider>
 
@@ -514,15 +606,20 @@ const FormPengajuanLimbahCair: React.FC = () => {
 
         <Form.Item
           name="form_kapasitas_ipal"
-          label="Kapasitas IPAL (m³)"
+          label={
+            <span>
+              Kapasitas IPAL (m³)
+              <Tooltip title="Kapasitas IPAL diubah pada halaman profil">
+                <InfoCircleOutlined style={{ marginLeft: 5, fontSize: '14px', color: '#1890ff' }} />
+              </Tooltip>
+            </span>
+          }
           rules={[{ required: true }]}
         >
-          <InputNumber
+          <Input
             value={form.kapasitas_ipal}
             name="kapasitas_ipal"
             style={inputNumberStyles}
-            min={0}
-            step={0.1}
             placeholder="Data diambil dari profil user"
             disabled={true}
             readOnly={true}
@@ -546,7 +643,7 @@ const FormPengajuanLimbahCair: React.FC = () => {
 
         <Form.Item
           name="form_link_ujilab_cair"
-          label="Link Uji Lab Cair"
+          label="Link Pemeriksaan Limbah Cair"
           rules={[{ required: true }]}
         >
           <Input
@@ -585,7 +682,7 @@ const FormPengajuanLimbahCair: React.FC = () => {
             </Button>
           </Space>
         </Form.Item>
-      </Form>
+      </div>
     ),
   };
 
@@ -599,59 +696,23 @@ const FormPengajuanLimbahCair: React.FC = () => {
 
   return (
     <>
-      <Form form={formInstance}>
-        <br />
-        <Space wrap>
-          <Form.Item
-            name="form_periode"
-            rules={[{ required: true }]}
-            label="Periode"
-          >
-            <Select
-              placeholder="Pilih Bulan Periode"
-              onChange={(v) => handleChangeSelect(v, "periode", event)}
-              style={{ width: 200 }}
-              options={[
-                { value: 1, label: "Januari" },
-                { value: 2, label: "Februari" },
-                { value: 3, label: "Maret" },
-                { value: 4, label: "April" },
-                { value: 5, label: "Mei" },
-                { value: 6, label: "Juni" },
-                { value: 7, label: "Juli" },
-                { value: 8, label: "Agustus" },
-                { value: 9, label: "September" },
-                { value: 10, label: "Oktober" },
-                { value: 11, label: "November" },
-                { value: 12, label: "Desember" },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item
-            name="form_tahun"
-            label="Tahun"
-            rules={[{ required: true }]}
-          >
-            <Input
-              placeholder="Masukan Tahun"
-              onChange={handleChangeInput}
-              value={form.tahun}
-              maxLength={4}
-              name="tahun"
-            />
-          </Form.Item>
-        </Space>
-      </Form>
-      <Card
-        style={{ width: "100%" }}
-        tabList={tabListNoTitle}
-        activeTabKey={activeTabKey2}
-        onTabChange={onTab2Change}
+      <Form 
+        form={formInstance}
+        {...layout}
+        onFinish={handleSubmit}
+        name="control-hooks"
       >
-        <div style={{ display: "flex", justifyContent: "center" }}>
-          {contentListNoTitle[activeTabKey2]}
-        </div>
-      </Card>
+        <Card
+          style={{ width: "100%" }}
+          tabList={tabListNoTitle}
+          activeTabKey={activeTabKey2}
+          onTabChange={onTab2Change}
+        >
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            {contentListNoTitle[activeTabKey2]}
+          </div>
+        </Card>
+      </Form>
     </>
   );
 };

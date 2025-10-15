@@ -1,13 +1,27 @@
 import MainLayout from "@/components/MainLayout";
-import FormViewLaporan from "@/components/admin/laporan/FormViewLaporan";
-import React from "react";
+import FormViewLaporanLabUser from "@/components/user/lab/FormViewLaporanLabUser";
+import React, { useEffect } from "react";
+import { useRouter } from "next/router";
+import { message } from "antd";
 
 const PageViewLab = () => {
+  const router = useRouter();
+  const { id } = router.query;
+
+  useEffect(() => {
+    // Validate that ID parameter exists
+    if (router.isReady && !id) {
+      message.error('ID laporan tidak ditemukan dalam URL');
+      // Optionally redirect back to the list page
+      // router.push('/dashboard/user/lab-lainnya');
+    }
+  }, [router.isReady, id, router]);
+
   return (
-    <MainLayout title="Form Laporan Pemeriksaan Lab Lainnya">
-      <h2 style={{ textAlign: "center" }}>Manajemen Laporan Pemeriksaan Lab Lainnya</h2>
+    <MainLayout title="Detail Laporan Pemeriksaan Lab Lainnya">
+      <h2 style={{ textAlign: "center" }}>Detail Laporan Pemeriksaan Lab Lainnya</h2>
       <div style={{ display: "flex", justifyContent: "center" }}>
-        <FormViewLaporan />
+        <FormViewLaporanLabUser />
       </div>
     </MainLayout>
   );

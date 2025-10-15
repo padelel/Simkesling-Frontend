@@ -449,7 +449,7 @@ const ViewTransporter: React.FC = () => {
                   let dateAkhirItem = dateRangeList[index][1];
                   let linkMou = linkMouList[index];
                   return (
-                    <>
+                    <React.Fragment key={`mou-${index}`}>
                       {dateAwalItem.format("DD MMMM YYYY").toString()}
                       {" - "}
                       {dateAkhirItem.format("DD MMMM YYYY").toString()}
@@ -462,7 +462,7 @@ const ViewTransporter: React.FC = () => {
                         <b>{"  "}Dokumen MOU</b>
                       </a>
                       <hr />
-                    </>
+                    </React.Fragment>
                   );
                 })}
               </b>

@@ -13,128 +13,26 @@ import {
   Select,
   Space,
   Spin,
+  Typography,
+  Divider,
 } from "antd";
-import dynamic from "next/dynamic";
+import { BarChartOutlined, CalendarOutlined, FilterOutlined } from "@ant-design/icons";
 import cloneDeep from "clone-deep";
 import api from "@/utils/HttpRequest";
 import { useGlobalStore } from "@/stores/globalStore";
 
+const { Title, Text } = Typography;
+
 const DashboardLabLainnyaPage: React.FC = () => {
-  const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
   const globalStore = useGlobalStore();
   const userLoginStore = useUserLoginStore();
   const messageLab = "Anda belum mengisi data pemeriksaan lab periode";
   const [pesan, setPesan] = useState("");
   const [judulChart, setJudulChart] = useState("");
   const [lapor, setLapor] = useState(false);
+  const [bulanSudahLapor, setBulanSudahLapor] = useState<boolean[]>([]);
 
   const [formInstance] = Form.useForm();
-
-  const tmpSeries = [
-    {
-      name: "Total Pemeriksaan Lab", //will be displayed on the y-axis
-      data: [] as number[],
-    },
-  ];
-
-  const [series, setSeries] = useState(cloneDeep(tmpSeries));
-  const [chartWidth, setChartWidth] = useState(700);
-  const [chartHeight, setChartHeight] = useState(400);
-  
-  // Create options with proper structure to avoid hasOwnProperty issues
-  const getChartOptions = () => {
-    return {
-      chart: {
-        id: "simple-bar",
-        type: 'bar' as const,
-        height: 350,
-        stacked: true,
-        toolbar: {
-          show: true
-        },
-        zoom: {
-          enabled: true
-        }
-      },
-      responsive: [{
-        breakpoint: 480,
-        options: {
-          legend: {
-            position: 'bottom' as const,
-            offsetX: -10,
-            offsetY: 0
-          }
-        }
-      }],
-      plotOptions: {
-        bar: {
-          horizontal: false,
-          borderRadius: 10,
-          dataLabels: {
-            total: {
-              enabled: true,
-              style: {
-                fontSize: '13px',
-                fontWeight: 900
-              },
-              formatter: function (val: number) {
-                return val ? parseFloat(val.toFixed(1)).toString() : '0';
-              }
-            }
-          }
-        },
-      },
-      dataLabels: {
-        enabled: true,
-        formatter: function (val: number) {
-          return val ? parseFloat(val.toFixed(1)).toString() : '0';
-        },
-        style: {
-          fontSize: '12px',
-          colors: ['#fff']
-        }
-      },
-      xaxis: {
-        categories: [
-          "Januari",
-          "Februari",
-          "Maret",
-          "April",
-          "Mei",
-          "Juni",
-          "Juli",
-          "Agustus",
-          "September",
-          "Oktober",
-          "November",
-          "Desember",
-        ],
-      },
-      yaxis: {
-        title: {
-          text: "Jumlah Pemeriksaan",
-        },
-      },
-      legend: {
-        position: 'right' as const,
-        offsetY: 40
-      },
-      fill: {
-        opacity: 1
-      },
-      tooltip: {
-        y: {
-          formatter: function (val: number) {
-            return val ? parseFloat(val.toFixed(1)).toString() + ' Pemeriksaan' : '0 Pemeriksaan';
-          }
-        }
-      },
-      title: {
-        text: String(judulChart || ''), // Ensure string type
-        align: "center" as const,
-      },
-    };
-  };
 
   let tmpForm = {
     tahun: "",
@@ -169,59 +67,13 @@ const DashboardLabLainnyaPage: React.FC = () => {
       dataForm.append("tahun", form.tahun);
       let url = "/user/dashboard-user/data-lab";
       let responsenya = await api.post(url, dataForm);
-      let tmpData = responsenya.data.data.values.total_lab_chart_year;
-      console.log('Lab Data:', tmpData);
       
-      // Validasi dan format data untuk ApexCharts - Lab Lainnya
-        try {
-          let processedSeries = [];
-          
-          if (tmpData && Array.isArray(tmpData) && tmpData.length > 0) {
-            for (const item of tmpData) {
-              if (item && item.name) {
-                const cleanData = [];
-                
-                if (Array.isArray(item.data) && item.data.length > 0) {
-                  for (let i = 0; i < 12; i++) {
-                    const val = item.data[i];
-                    if (val === null || val === undefined || val === '' || isNaN(val)) {
-                      cleanData.push(0);
-                    } else {
-                      cleanData.push(Number(val));
-                    }
-                  }
-                } else {
-                  // Default 12 months with 0
-                  for (let i = 0; i < 12; i++) {
-                    cleanData.push(0);
-                  }
-                }
-                
-                // Create simple object
-                processedSeries.push({
-                  name: String(item.name),
-                  data: cleanData
-                });
-              }
-            }
-          }
-          
-          // Set default if no valid data
-          if (processedSeries.length === 0) {
-            processedSeries = [{
-              name: 'Data Pemeriksaan Lab',
-              data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-            }];
-          }
-          
-          setSeries(processedSeries);
-        } catch (error) {
-          console.error('Error processing chart data:', error);
-          setSeries([{
-            name: 'Data Pemeriksaan Lab',
-            data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-          }]);
-        }
+      // Set data bulan sudah lapor
+      if (responsenya.data.data.values.bulan_sudah_lapor && Array.isArray(responsenya.data.data.values.bulan_sudah_lapor)) {
+        setBulanSudahLapor(responsenya.data.data.values.bulan_sudah_lapor);
+      } else {
+        setBulanSudahLapor([false, false, false, false, false, false, false, false, false, false, false, false]);
+      }
       
       let tmpPesan = "";
       let tmpJudulChart = "";
@@ -248,94 +100,259 @@ const DashboardLabLainnyaPage: React.FC = () => {
 
   useEffect(() => {
     hitDashboard();
-    const handleResize = () => {
-      // Periksa lebar layar dan atur lebar chart sesuai dengan kondisi tertentu
-      if (window.innerWidth < 700) {
-        setChartWidth(300);
-        setChartHeight(400);
-      } else {
-        setChartWidth(700);
-      }
-    };
-
-    // Tambahkan event listener untuk mengikuti perubahan ukuran layar
-    window.addEventListener("resize", handleResize);
-
-    // Panggil handleResize saat komponen pertama kali dimuat
-    handleResize();
-
-    // Hapus event listener saat komponen dibongkar
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
   }, []);
 
   return (
     <MainLayout title={"Dashboard Pemeriksaan Lab Lainnya"}>
-      <Spin spinning={globalStore.isloading}>
-        <h2>Laporan Pemeriksaan Lab Lainnya</h2>
+      <div style={{ 
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+        minHeight: '100vh',
+        padding: '24px'
+      }}>
+        <Spin spinning={globalStore.isloading}>
+          {/* Header Section */}
+          <Card 
+            style={{ 
+              marginBottom: '24px',
+              borderRadius: '16px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+              border: 'none',
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+            }}
+          >
+            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+              <BarChartOutlined style={{ fontSize: '48px', color: '#1890ff', marginBottom: '16px' }} />
+              <Title level={2} style={{ margin: 0, color: '#333', fontWeight: 700 }}>
+                Dashboard Pemeriksaan Lab Lainnya
+              </Title>
+              <Text style={{ fontSize: '16px', color: '#666' }}>
+                Monitoring dan Analisis Data Pemeriksaan Laboratorium
+              </Text>
+            </div>
+          </Card>
 
-        <Form form={formInstance}>
-          <br />
-          <Space wrap>
-            <Form.Item name="form_tahun" label="Tahun">
-              <Input
-                placeholder="Masukan Tahun (contoh: 2024)"
-                onChange={handleChangeInput}
-                maxLength={4}
-                name="tahun"
-                style={{ width: 200 }}
+          {/* Filter Section */}
+          <Card 
+            style={{ 
+              marginBottom: '24px',
+              borderRadius: '12px',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+              border: 'none'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+              <FilterOutlined style={{ fontSize: '20px', color: '#1890ff', marginRight: '8px' }} />
+              <Title level={4} style={{ margin: 0, color: '#333' }}>Filter Data</Title>
+            </div>
+            
+            <Form form={formInstance}>
+              <Row gutter={16} align="middle">
+                <Col xs={24} sm={12} md={8}>
+                  <Form.Item name="form_tahun" label="Tahun" style={{ marginBottom: 0 }}>
+                    <Input
+                      placeholder="Masukan Tahun (contoh: 2024)"
+                      onChange={handleChangeInput}
+                      maxLength={4}
+                      name="tahun"
+                      size="large"
+                      prefix={<CalendarOutlined style={{ color: '#1890ff' }} />}
+                      style={{ borderRadius: '8px' }}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12} md={8}>
+                  <Button 
+                    type="primary" 
+                    onClick={hitDashboard}
+                    size="large"
+                    style={{ 
+                      borderRadius: '8px',
+                      background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)',
+                      border: 'none',
+                      fontWeight: 600,
+                      height: '40px',
+                      minWidth: '120px'
+                    }}
+                  >
+                    <FilterOutlined /> Filter Data
+                  </Button>
+                </Col>
+              </Row>
+            </Form>
+          </Card>
+
+          {/* Alert Section */}
+          <Card 
+            style={{ 
+              marginBottom: '24px',
+              borderRadius: '12px',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+              border: 'none'
+            }}
+          >
+            {!lapor && (
+              <Alert
+                message="📋 Status Laporan"
+                description={pesan}
+                type="warning"
+                showIcon
+                style={{ 
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #fff7e6 0%, #fff2d3 100%)'
+                }}
               />
-            </Form.Item>
-            <Form.Item>
-              <Button type="primary" onClick={hitDashboard}>
-                Filter
-              </Button>
-            </Form.Item>
-          </Space>
-        </Form>
+            )}
+            {lapor && (
+              <Alert
+                message="✅ Status Laporan"
+                description={pesan}
+                type="success"
+                showIcon
+                style={{ 
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%)'
+                }}
+              />
+            )}
+          </Card>
 
-        {!lapor && (
-          <Alert
-            message="Pemberitahuan"
-            description={pesan}
-            type="warning"
-            showIcon
-          />
-        )}
-        {lapor && (
-          <Alert
-            message="Pemberitahuan"
-            description={pesan}
-            type="success"
-            showIcon
-          />
-        )}
-
-        <div
-          style={{ marginTop: 30, display: "flex", justifyContent: "center", flexDirection: "column", alignItems: "center" }}>
-          <Row>
-            <Col>
-              {typeof window !== undefined && (
-                <Chart
-                  options={getChartOptions()}
-                  type="bar"
-                  width={chartWidth}
-                  height={chartHeight}
-                  series={series}
-                />
-              )}
-            </Col>
-          </Row>
-          
-          {/* Keterangan Satuan Data */}
-          <div style={{ marginTop: 20, textAlign: 'center', padding: '16px', backgroundColor: '#f0f2f5', borderRadius: '8px', maxWidth: '600px' }}>
-            <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>
-              <strong>Keterangan:</strong> Semua data pemeriksaan lab dalam grafik menggunakan satuan <strong>Jumlah Pemeriksaan</strong>
-            </p>
-          </div>
-        </div>
-      </Spin>
+          {/* Monthly Status Section */}
+          <Card 
+            style={{ 
+              borderRadius: '16px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+              border: 'none',
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+            }}
+          >
+            <div style={{ padding: '20px' }}>
+              <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                <CalendarOutlined style={{ fontSize: '32px', color: '#1890ff', marginBottom: '12px' }} />
+                <Title level={3} style={{ margin: 0, color: '#333', fontWeight: 600 }}>
+                  Status Laporan Bulanan {form.tahun || new Date().getFullYear()}
+                </Title>
+                <Text style={{ fontSize: '14px', color: '#666' }}>
+                  Pantau status kelengkapan laporan setiap bulan
+                </Text>
+              </div>
+              
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', 
+                gap: '16px',
+                maxWidth: '1000px',
+                margin: '0 auto'
+              }}>
+                {[
+                  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+                ].map((bulan, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      padding: '20px 16px',
+                      borderRadius: '12px',
+                      textAlign: 'center',
+                      background: bulanSudahLapor[index] 
+                        ? 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)' 
+                        : 'linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%)',
+                      color: 'white',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                      transform: 'translateY(0)',
+                      transition: 'all 0.3s ease',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-4px)';
+                      e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.2)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)';
+                    }}
+                  >
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: 'rgba(255,255,255,0.1)',
+                      opacity: 0,
+                      transition: 'opacity 0.3s ease'
+                    }} />
+                    <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>
+                      {bulan}
+                    </div>
+                    <div style={{ 
+                      fontSize: '24px', 
+                      marginBottom: '4px',
+                      filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))'
+                    }}>
+                      {bulanSudahLapor[index] ? '✅' : '❌'}
+                    </div>
+                    <div style={{ fontSize: '12px', fontWeight: 500, opacity: 0.9 }}>
+                      {bulanSudahLapor[index] ? 'Sudah Lapor' : 'Belum Lapor'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Legend */}
+              <div style={{ 
+                marginTop: '32px', 
+                textAlign: 'center',
+                padding: '20px',
+                background: 'linear-gradient(135deg, #f0f2f5 0%, #e6f7ff 100%)',
+                borderRadius: '12px',
+                border: '1px solid #d9d9d9'
+              }}>
+                <Title level={5} style={{ marginBottom: '16px', color: '#333' }}>Keterangan Status</Title>
+                <Row justify="center" gutter={32}>
+                  <Col>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ 
+                        width: '20px', 
+                        height: '20px', 
+                        background: 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)', 
+                        borderRadius: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '12px'
+                      }}>
+                        ✅
+                      </div>
+                      <Text style={{ fontWeight: 500, color: '#333' }}>Sudah Lapor</Text>
+                    </div>
+                  </Col>
+                  <Col>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ 
+                        width: '20px', 
+                        height: '20px', 
+                        background: 'linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%)', 
+                        borderRadius: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '12px'
+                      }}>
+                        ❌
+                      </div>
+                      <Text style={{ fontWeight: 500, color: '#333' }}>Belum Lapor</Text>
+                    </div>
+                  </Col>
+                </Row>
+              </div>
+            </div>
+          </Card>
+        </Spin>
+      </div>
     </MainLayout>
   );
 };

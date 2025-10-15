@@ -17,8 +17,8 @@ import {
 import { MPengajuanTransporter } from "../../../../models/MPengajuanTransporter";
 import { usePengajuanTransporterStore } from "@/stores/pengajuanTransporterStore";
 import { useRouter } from "next/router";
-import { MLaporanBulanan } from "@/models/MLaporanBulanan";
-import { useLaporanBulananStore } from "@/stores/laporanBulananStore";
+import { MLaporanLab } from "@/models/MLaporanLab";
+import { useLaporanLabStore } from "@/stores/laporanLabStore";
 import { useGlobalStore } from "@/stores/globalStore";
 import cloneDeep from "clone-deep";
 import { parsingDate } from "@/utils/common";
@@ -87,7 +87,7 @@ const showDeleteConfirm = () => {
 const Index: React.FC = () => {
   const [data, setData] = useState<DataType[]>([]);
   const [dataSearch, setDataSearch] = useState<DataType[]>([]);
-  const laporanBulananStore = useLaporanBulananStore();
+  const laporanLabStore = useLaporanLabStore();
   const globalStore = useGlobalStore();
   const router = useRouter();
 
@@ -103,19 +103,6 @@ const Index: React.FC = () => {
       dataIndex: "tahun",
       // defaultSortOrder: "descend",
       sorter: (a: any, b: any) => b.tahun - a.tahun,
-    },
-    {
-      title: "Nama Lab",
-      dataIndex: "namaLab",
-      // defaultSortOrder: "descend",
-      // sorter: (a: any, b: any) => a.namaLab - b.namaLab,
-    },
-    {
-      title: "Total Pemeriksaan",
-      dataIndex: "totalPemeriksaan",
-      // defaultSortOrder: "descend",
-      sorter: (a: any, b: any) =>
-        b.totalPemeriksaan.localeCompare(a.totalPemeriksaan),
     },
     {
       title: "Tanggal Dibuat",
@@ -135,20 +122,18 @@ const Index: React.FC = () => {
     {
       title: "Action",
       key: "action",
-      render: (_: any, record: MLaporanBulanan) => {
+      render: (_: any, record: MLaporanLab) => {
         // console.log(record);
 
-        const toFormPage = (param: MLaporanBulanan) => {
-          if (laporanBulananStore.simpenSementara) {
-            laporanBulananStore.simpenSementara(param);
+        const toFormPage = (param: MLaporanLab) => {
+          if (laporanLabStore.simpenSementara) {
+            laporanLabStore.simpenSementara(param);
             router.push("/dashboard/user/lab-lainnya/PageTambahLab?action=edit");
           }
         };
-        const toViewPage = (param: MLaporanBulanan) => {
-          if (laporanBulananStore.simpenSementara) {
-            laporanBulananStore.simpenSementara(param);
-            router.push("/dashboard/user/lab-lainnya/PageViewLab?action=view");
-          }
+        const toViewPage = (param: MLaporanLab) => {
+          // Navigate using ID parameter instead of store
+          router.push(`/dashboard/user/lab-lainnya/PageViewLab?id=${param.id_laporan_lab}`);
         };
         return (
           <Space size="middle">
@@ -174,14 +159,21 @@ const Index: React.FC = () => {
     if (globalStore.setLoading) globalStore.setLoading(true);
     try {
       const response = await api.post("/user/laporan-lab/data");
-      const responseData = response.data.data.values;
+      const responseData = response.data.data;
 
-      const transformedData = responseData.map((item: any) => ({
+      // Check if responseData exists and has data property
+      if (!responseData || !responseData.data || !Array.isArray(responseData.data)) {
+        console.warn("No data found or data is not an array:", responseData);
+        setData([]);
+        setData2([]);
+        setDataSearch([]);
+        return;
+      }
+
+      const transformedData = responseData.data.map((item: any) => ({
         ...item,
         periode_nama: item.periode_nama,
         tahun: item.tahun,
-        namaLab: item.nama_lab,
-        totalPemeriksaan: item.total_pemeriksaan,
         created_at: item.created_at,
         updated_at: item.updated_at,
         key: item.id_laporan_lab.toString(),
@@ -192,6 +184,9 @@ const Index: React.FC = () => {
       setDataSearch(transformedData);
     } catch (error) {
       console.error("Error fetching data:", error);
+      setData([]);
+      setData2([]);
+      setDataSearch([]);
     } finally {
       if (globalStore.setLoading) globalStore.setLoading(false);
     }
@@ -209,10 +204,6 @@ const Index: React.FC = () => {
   const doSearch = () => {
     const tmpData = data2.filter((val) => {
       if (
-        val.namaLab
-          .toString()
-          .toLowerCase()
-          .includes(search.toLowerCase()) ||
         val.periode_nama.toString().toLowerCase().includes(search.toLowerCase())
       ) {
         return true;
@@ -238,7 +229,7 @@ const Index: React.FC = () => {
             value={search}
             style={{ boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.2)" }}
             name="search"
-            placeholder="Cari Berdasarkan Nama Lab"
+            placeholder="Cari Berdasarkan Periode"
           />
         </Col>
         <Col>

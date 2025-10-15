@@ -155,6 +155,8 @@ const FormViewLaporan: React.FC = () => {
     limbah_padat_infeksius: "",
     limbah_jarum: "",
     sludge_ipal: "",
+    limbah_cair_b3: "",
+    debit_limbah_cair: "",
     catatan: "",
     link_input_manifest: "",
     link_input_logbook: "",
@@ -513,7 +515,7 @@ const FormViewLaporan: React.FC = () => {
         if (user.level == "1") {
           router.push("/dashboard/admin/manajemen/laporan");
         } else {
-          router.push("/dashboard/user/limbah");
+          router.push("/dashboard/user/limbah-padat");
         }
         return;
       }
@@ -548,6 +550,7 @@ const FormViewLaporan: React.FC = () => {
         limbah_padat_infeksius: laporanBulananStore.limbah_padat_infeksius?.toString() ?? "",
         limbah_jarum: laporanBulananStore.limbah_jarum?.toString() ?? "",
         limbah_cair_b3: laporanBulananStore.limbah_cair_b3?.toString() ?? "",
+        debit_limbah_cair: laporanBulananStore.debit_limbah_cair?.toString() ?? "",
         sludge_ipal: laporanBulananStore.limbah_sludge_ipal?.toString() ?? "",
         catatan: laporanBulananStore.catatan?.toString() ?? "",
         link_input_manifest:
@@ -594,6 +597,8 @@ const FormViewLaporan: React.FC = () => {
           laporanBulananStore.limbah_padat_infeksius?.toString() ?? "",
         form_debitLimbah:
           laporanBulananStore.limbah_cair_b3?.toString() ?? "",
+        form_debitLimbahCair:
+          laporanBulananStore.debit_limbah_cair?.toString() ?? "",
         form_catatan: laporanBulananStore.catatan?.toString() ?? "",
         form_link_input_manifest:
           laporanBulananStore.link_input_manifest?.toString() ?? "",
@@ -622,7 +627,7 @@ const FormViewLaporan: React.FC = () => {
         if (user.level == "1") {
           router.push("/dashboard/admin/manajemen/laporan");
         } else {
-          router.push("/dashboard/user/limbah");
+          router.push("/dashboard/user/limbah-padat");
         }
       }
       // router.push("/dashboard/user/limbah");
@@ -662,10 +667,16 @@ const FormViewLaporan: React.FC = () => {
                 <td>{form.limbah_jarum}</td>
               </tr>
 
-              <tr>
+              {/* <tr>
                 <td>Total Limbah Cair B3 (Kg)</td>
                 <td>:</td>
                 <td>{form.limbah_cair_b3}</td>
+              </tr> */}
+
+              <tr>
+                <td>Total Limbah Cair B3 (Kg)</td>
+                <td>:</td>
+                <td>{form.debit_limbah_cair}</td>
               </tr>
 
               <tr>
@@ -693,10 +704,10 @@ const FormViewLaporan: React.FC = () => {
                 <th>Catatan</th>
                 <th>Berat</th>
               </tr>
-              {limbahPadatList.map((val) => {
+              {limbahPadatList.map((val, index) => {
                 let item = val;
                 return (
-                  <>
+                  <React.Fragment key={`limbah-padat-${index}`}>
                     <tr>
                       <td>
                         {item.name}
@@ -711,7 +722,7 @@ const FormViewLaporan: React.FC = () => {
                         {item.berat}
                       </td>
                     </tr>
-                  </>
+                  </React.Fragment>
                 );
               })}
             </tbody>

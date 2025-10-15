@@ -48,6 +48,7 @@ export interface MLaporanBulanan {
   limbah_sludge_ipal: string;
   limbah_padat_infeksius: string;
   limbah_cair_b3: string; // Field untuk limbah cair B3
+  debit_limbah_cair: string; // Field untuk debit limbah cair
 
   simpenSementara?: Function;
 }

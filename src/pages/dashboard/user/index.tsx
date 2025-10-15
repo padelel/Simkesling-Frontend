@@ -15,7 +15,7 @@ import {
   Spin,
 } from "antd";
 import { useRouter } from "next/router";
-import { BarChartOutlined, DropboxOutlined } from "@ant-design/icons";
+import { BarChartOutlined, DropboxOutlined, ExperimentOutlined } from "@ant-design/icons";
 import dynamic from "next/dynamic";
 import cloneDeep from "clone-deep";
 import api from "@/utils/HttpRequest";
@@ -26,8 +26,12 @@ const DashboardPage: React.FC = () => {
   const globalStore = useGlobalStore();
   const userLoginStore = useUserLoginStore();
 
-  const navigateToDashboard = (type: 'limbah-padat' | 'limbah-cair') => {
-    router.push(`/dashboard/user/${type}/dashboard`);
+  const navigateToDashboard = (type: 'limbah-padat' | 'limbah-cair' | 'lab-lainnya') => {
+    if (type === 'lab-lainnya') {
+      router.push('/dashboard/user/lab-lainnya/dashboard');
+    } else {
+      router.push(`/dashboard/user/${type}/dashboard`);
+    }
   };
 
   return (
@@ -70,6 +74,24 @@ const DashboardPage: React.FC = () => {
               <DropboxOutlined style={{ fontSize: '4rem', color: '#52c41a', marginBottom: '20px' }} />
               <h3 style={{ marginBottom: '10px', fontSize: '1.5rem' }}>Dashboard Limbah Cair</h3>
               <p style={{ color: '#666', margin: 0 }}>Kelola dan pantau data limbah cair</p>
+            </Card>
+          </Col>
+
+          <Col xs={24} sm={12} md={8} lg={6}>
+            <Card
+              hoverable
+              style={{
+                textAlign: 'center',
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                transition: 'all 0.3s ease'
+              }}
+              bodyStyle={{ padding: '40px 20px' }}
+              onClick={() => navigateToDashboard('lab-lainnya')}
+            >
+              <ExperimentOutlined style={{ fontSize: '4rem', color: '#722ed1', marginBottom: '20px' }} />
+              <h3 style={{ marginBottom: '10px', fontSize: '1.5rem' }}>Dashboard Lab Lainnya</h3>
+              <p style={{ color: '#666', margin: 0 }}>Kelola dan pantau data pemeriksaan lab lainnya</p>
             </Card>
           </Col>
         </Row>

@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { useState, createContext, useContext } from "react";
+import React, { useEffect, useMemo, useCallback } from "react";
+import { useState } from "react";
 import MainLayout from "@/components/MainLayout";
 import { useUserLoginStore } from "@/stores/userLoginStore";
 import {
@@ -13,192 +13,320 @@ import {
   Select,
   Space,
   Spin,
+  message,
 } from "antd";
 import dynamic from "next/dynamic";
-import cloneDeep from "clone-deep";
 import api from "@/utils/HttpRequest";
 import { useGlobalStore } from "@/stores/globalStore";
 
+// Lazy load chart component for better performance
+const Chart = dynamic(() => import("react-apexcharts"), { 
+  ssr: false,
+  loading: () => <div style={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading Chart...</div>
+});
+
+// Types for better type safety
+interface LimbahCairData {
+  periode: string;
+  tahun: string;
+  ph: string;
+  bod: string;
+  cod: string;
+  tss: string;
+  minyak_lemak: string;
+  amoniak: string;
+  total_coliform: string;
+  debit_air_limbah: string;
+}
+
+interface ChartSeries {
+  name: string;
+  data: (number | null)[];
+  color: string;
+}
+
+interface MonthlyData {
+  ph: number[];
+  bod: number[];
+  cod: number[];
+  tss: number[];
+  minyak_lemak: number[];
+  amoniak: number[];
+  total_coliform: number[];
+  debit_air_limbah: number[];
+}
+
 const DashboardLimbahCairPage: React.FC = () => {
-  const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
   const globalStore = useGlobalStore();
   const userLoginStore = useUserLoginStore();
-  const messageLimbah = "Anda belum mengisi data limbah periode";
+  
+  // State management
   const [pesan, setPesan] = useState("");
-  const [judulChartLimbahCair, setJudulChartLimbahCair] = useState("");
+  const [judulChart, setJudulChart] = useState("");
   const [lapor, setLapor] = useState(false);
+  const [series, setSeries] = useState<ChartSeries[]>([]);
+  const [chartWidth, setChartWidth] = useState(700);
+  const [chartHeight, setChartHeight] = useState(400);
 
   const [formInstance] = Form.useForm();
 
-  const tmpSeriesLimbahCair = [
-    {
-      name: "pH",
-      data: [] as (number | null)[],
-      color: '#FF6B6B' // Red
-    },
-    {
-      name: "BOD (mg/l)",
-      data: [] as (number | null)[],
-      color: '#4ECDC4' // Teal
-    },
-    {
-      name: "COD (mg/l)",
-      data: [] as (number | null)[],
-      color: '#45B7D1' // Blue
-    },
-    {
-      name: "TSS (mg/l)",
-      data: [] as (number | null)[],
-      color: '#96CEB4' // Green
-    },
-    {
-      name: "Minyak & Lemak (mg/l)",
-      data: [] as (number | null)[],
-      color: '#FFEAA7' // Yellow
-    },
-    {
-      name: "Amoniak (mg/l)",
-      data: [] as (number | null)[],
-      color: '#DDA0DD' // Plum
-    },
-    {
-      name: "Total Coliform (MPN/100ml)",
-      data: [] as (number | null)[],
-      color: '#FFA07A' // Light Salmon
-    },
-    {
-      name: "Debit Air Limbah (M³/bulan)",
-      data: [] as (number | null)[],
-      color: '#20B2AA' // Light Sea Green
-    },
-  ];
+  // Form state
+  const [form, setForm] = useState({
+    tahun: new Date().getFullYear().toString(),
+  });
 
-  const [seriesLimbahCair, setSeriesLimbahCair] = useState(cloneDeep(tmpSeriesLimbahCair));
-  const [chartWidth, setChartWidth] = useState(700);
-  const [chartHeight, setChartHeight] = useState(400);
-  
-  const optionsLimbahCair = {
-    chart: {
-      id: "limbah-cair-bar",
-      type: 'bar' as const,
-      height: 450,
-      stacked: true,
-      toolbar: {
-        show: true
-      },
-      zoom: {
-        enabled: true
-      }
-    },
-    colors: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#FFA07A', '#20B2AA'],
-    responsive: [{
-      breakpoint: 480,
-      options: {
-        legend: {
-          position: 'bottom' as const,
-          offsetX: -10,
-          offsetY: 0
+  // Add state for tracking current date to detect changes
+  const [currentDate, setCurrentDate] = useState({
+    month: new Date().getMonth() + 1,
+    year: new Date().getFullYear()
+  });
+
+  // Memoized constants to prevent recreation on every render
+  const defaultSeriesTemplate = useMemo(() => [
+    { name: "pH", data: [] as (number | null)[], color: '#FF6B6B' },
+    { name: "BOD (mg/l)", data: [] as (number | null)[], color: '#4ECDC4' },
+    { name: "COD (mg/l)", data: [] as (number | null)[], color: '#45B7D1' },
+    { name: "TSS (mg/l)", data: [] as (number | null)[], color: '#96CEB4' },
+    { name: "Minyak & Lemak (mg/l)", data: [] as (number | null)[], color: '#FFEAA7' },
+    { name: "Amoniak (mg/l)", data: [] as (number | null)[], color: '#DDA0DD' },
+    { name: "Total Coliform (MPN/100ml)", data: [] as (number | null)[], color: '#FFA07A' },
+    { name: "Debit Air Limbah (M³/bulan)", data: [] as (number | null)[], color: '#20B2AA' },
+  ], []);
+
+  // Add state to store original data for detailed tooltips
+  const [originalData, setOriginalData] = useState<LimbahCairData[]>([]);
+
+  // Create options with proper structure to avoid hasOwnProperty issues
+  const getChartOptions = () => {
+    return {
+      chart: {
+        id: "limbah-cair-bar",
+        type: 'bar' as const,
+        height: 350,
+        stacked: true,
+        toolbar: {
+          show: true
+        },
+        zoom: {
+          enabled: true
         }
-      }
-    }],
-    plotOptions: {
-      bar: {
-        horizontal: false,
-        borderRadius: 10,
-        dataLabels: {
-          total: {
-            enabled: true,
-            style: {
-              fontSize: '13px',
-              fontWeight: 900
-            },
-            formatter: function (val: any) {
-              return val ? parseFloat(val.toFixed(1)).toString() : '0';
-            }
+      },
+      colors: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#FFA07A', '#20B2AA'],
+      responsive: [{
+        breakpoint: 480,
+        options: {
+          legend: {
+            position: 'bottom' as const,
+            offsetX: -10,
+            offsetY: 0
           }
         }
+      }],
+      plotOptions: {
+        bar: {
+          horizontal: false,
+          borderRadius: 10,
+          dataLabels: {
+            // Removed total calculation
+          }
+        },
       },
-    },
-    dataLabels: {
-      enabled: true,
-      formatter: function (val: any) {
-        return val ? parseFloat(val.toFixed(1)).toString() : '0';
+      dataLabels: {
+        enabled: false, // Disable data labels to reduce clutter
       },
-      style: {
-        fontSize: '12px',
-        colors: ['#fff']
-      }
-    },
-    xaxis: {
-      categories: [
-        "Januari",
-        "Februari",
-        "Maret",
-        "April",
-        "Mei",
-        "Juni",
-        "Juli",
-        "Agustus",
-        "September",
-        "Oktober",
-        "November",
-        "Desember",
-      ],
-    },
-    yaxis: {
+      xaxis: {
+        categories: [
+          "Januari",
+          "Februari",
+          "Maret",
+          "April",
+          "Mei",
+          "Juni",
+          "Juli",
+          "Agustus",
+          "September",
+          "Oktober",
+          "November",
+          "Desember",
+        ],
+      },
+      yaxis: {
+        title: {
+          text: "Nilai Parameter",
+        },
+      },
+      legend: {
+        position: 'right' as const,
+        offsetY: 40
+      },
+      fill: {
+        opacity: 1
+      },
+      tooltip: {
+        shared: true,
+        intersect: false,
+        custom: function({ series, seriesIndex, dataPointIndex, w }: any) {
+          const monthNames = [
+            "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+            "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+          ];
+          
+          const monthName = monthNames[dataPointIndex];
+          const monthNumber = dataPointIndex + 1;
+          
+          // Find the original data for this month
+          const monthData = originalData.find(item => 
+            parseInt(item.periode) === monthNumber && 
+            parseInt(item.tahun) === parseInt(form.tahun)
+          );
+          
+          if (!monthData) {
+            return `
+              <div style="padding: 12px; background: white; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                <div style="font-weight: bold; margin-bottom: 8px; color: #333; border-bottom: 1px solid #eee; padding-bottom: 4px;">
+                  ${monthName} ${form.tahun}
+                </div>
+                <div style="color: #666; font-style: italic;">
+                  Tidak ada data laporan untuk bulan ini
+                </div>
+              </div>
+            `;
+          }
+          
+          return `
+            <div style="padding: 12px; background: white; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-width: 300px;">
+              <div style="font-weight: bold; margin-bottom: 8px; color: #333; border-bottom: 1px solid #eee; padding-bottom: 4px;">
+                Detail Laporan ${monthName} ${form.tahun}
+              </div>
+              <div style="font-size: 12px; line-height: 1.4;">
+                <div style="margin-bottom: 4px;"><strong>pH:</strong> ${monthData.ph || 'N/A'}</div>
+                <div style="margin-bottom: 4px;"><strong>BOD:</strong> ${monthData.bod || 'N/A'} mg/l</div>
+                <div style="margin-bottom: 4px;"><strong>COD:</strong> ${monthData.cod || 'N/A'} mg/l</div>
+                <div style="margin-bottom: 4px;"><strong>TSS:</strong> ${monthData.tss || 'N/A'} mg/l</div>
+                <div style="margin-bottom: 4px;"><strong>Minyak & Lemak:</strong> ${monthData.minyak_lemak || 'N/A'} mg/l</div>
+                <div style="margin-bottom: 4px;"><strong>Amoniak:</strong> ${monthData.amoniak || 'N/A'} mg/l</div>
+                <div style="margin-bottom: 4px;"><strong>Total Coliform:</strong> ${monthData.total_coliform || 'N/A'} MPN/100ml</div>
+                <div><strong>Debit Air Limbah:</strong> ${monthData.debit_air_limbah || 'N/A'} M³/bulan</div>
+              </div>
+            </div>
+          `;
+        }
+      },
       title: {
-        text: "Nilai Parameter",
+        text: String(judulChart || ''), // Ensure string type
+        align: "center" as const,
       },
-    },
-    legend: {
-      position: 'right' as const,
-      offsetY: 40,
-      fontSize: '12px',
-      markers: {
-        size: 6,
-        strokeWidth: 0,
-        fillColors: undefined,
-        shape: 'circle' as const
-      }
-    },
-    fill: {
-      opacity: 0.8
-    },
-    title: {
-      text: judulChartLimbahCair,
-      align: "center" as const,
-      style: {
-        fontSize: '16px',
-        fontWeight: 'bold'
-      }
-    },
-    tooltip: {
-      shared: true,
-      intersect: false,
-      y: {
-        formatter: function (val: any, opts: any) {
-          if (val === null || val === undefined) return 'Tidak ada data';
-          const seriesName = opts?.series?.[opts?.seriesIndex]?.name || '';
-          if (seriesName && seriesName.includes('pH')) {
-            return parseFloat(val.toFixed(1)).toString();
-          } else if (seriesName && seriesName.includes('Coliform')) {
-            return parseFloat(val.toFixed(0)).toString() + ' MPN/100ml';
-          } else if (seriesName && seriesName.includes('Debit')) {
-            return parseFloat(val.toFixed(2)).toString() + ' M³/bulan';
-          } else {
-            return parseFloat(val.toFixed(1)).toString() + ' mg/l';
-          }
-        }
-      }
+    };
+  };
+
+  // Optimized data processing function
+  const processChartData = useCallback((data: LimbahCairData[]) => {
+    console.log('Processing chart data:', data);
+    console.log('Data length:', data?.length);
+    console.log('Data type:', typeof data, 'Is Array:', Array.isArray(data));
+    
+    // Handle empty or invalid data - return default series with empty data
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      console.log('No data available for chart processing - returning default series');
+      return defaultSeriesTemplate.map(template => ({
+        ...template,
+        data: Array(12).fill(null)
+      }));
     }
-  };
 
-  let tmpForm = {
-    tahun: "",
-  };
+    const monthlyData: MonthlyData[] = Array(12).fill(null).map(() => ({
+      ph: [], bod: [], cod: [], tss: [],
+      minyak_lemak: [], amoniak: [], total_coliform: [], debit_air_limbah: []
+    }));
 
-  const [form, setForm] = useState(cloneDeep(tmpForm));
+    // Process data efficiently
+    data.forEach((item, index) => {
+      console.log(`Processing item ${index}:`, item);
+      
+      if (!item || typeof item !== 'object') {
+        console.warn('Invalid data item:', item);
+        return;
+      }
 
+      // Parse periode - handle both string and number
+      let periodeValue: number;
+      if (typeof item.periode === 'string') {
+        periodeValue = parseInt(item.periode);
+      } else if (typeof item.periode === 'number') {
+        periodeValue = item.periode;
+      } else {
+        console.warn('Invalid periode value:', item.periode);
+        return;
+      }
+      
+      const monthIndex = periodeValue - 1;
+      
+      console.log(`Item ${index} - periode: ${item.periode}, parsed: ${periodeValue}, monthIndex: ${monthIndex}`);
+      
+      if (monthIndex >= 0 && monthIndex < 12) {
+        // Parse all parameter values with better error handling
+        const parseValue = (value: any): number => {
+          if (value === null || value === undefined || value === '') return 0;
+          const parsed = parseFloat(value);
+          return isNaN(parsed) ? 0 : parsed;
+        };
+
+        const values = {
+          ph: parseValue(item.ph),
+          bod: parseValue(item.bod),
+          cod: parseValue(item.cod),
+          tss: parseValue(item.tss),
+          minyak_lemak: parseValue(item.minyak_lemak),
+          amoniak: parseValue(item.amoniak),
+          total_coliform: parseValue(item.total_coliform),
+          debit_air_limbah: parseValue(item.debit_air_limbah)
+        };
+
+        console.log(`Parsed values for month ${monthIndex + 1}:`, values);
+
+        // Add all values to monthly data
+        Object.entries(values).forEach(([key, value]) => {
+          monthlyData[monthIndex][key as keyof MonthlyData].push(value);
+        });
+        
+        console.log(`Monthly data for month ${monthIndex + 1} after adding:`, monthlyData[monthIndex]);
+      } else {
+        console.warn(`Invalid month index ${monthIndex} for periode ${periodeValue}`);
+      }
+    });
+
+    console.log('Final monthly data after processing all items:', monthlyData);
+
+    // Calculate averages efficiently
+    const calculateAverage = (arr: number[]) => {
+      if (arr.length === 0) return null;
+      const sum = arr.reduce((a, b) => a + b, 0);
+      const avg = sum / arr.length;
+      console.log(`Calculating average for array [${arr.join(', ')}] = ${avg}`);
+      return avg;
+    };
+
+    const allSeries = defaultSeriesTemplate.map((template, index) => {
+      const parameterKey = Object.keys(monthlyData[0])[index] as keyof MonthlyData;
+      const seriesData = monthlyData.map(month => calculateAverage(month[parameterKey]));
+      
+      console.log(`Series ${template.name} (${parameterKey}):`, seriesData);
+      console.log(`Series ${template.name} has data:`, seriesData.some(val => val !== null));
+      
+      return {
+        ...template,
+        data: seriesData
+      };
+    });
+
+    console.log('Generated series:', allSeries);
+    console.log('Chart has data:', allSeries.some(series => series.data.some(val => val !== null)));
+    
+    // Always return all series, even if they have no data
+    return allSeries;
+  }, [defaultSeriesTemplate]);
+
+  // Form change handlers
   const handleChangePeriode = (val: any, name: string, event: any) => {
     const periode = parseInt(val);
     console.log(val);
@@ -212,144 +340,98 @@ const DashboardLimbahCairPage: React.FC = () => {
   const handleChangeInput = (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    // console.log(event);
     setForm({
       ...form,
       [event.target.name]: event.target.value,
     });
   };
 
+  // Main data fetching function
   const hitDashboard = async () => {
     if (globalStore.setLoading) globalStore.setLoading(true);
+    
     try {
-      let dataForm: any = new FormData();
+      const dataForm = new FormData();
       dataForm.append("tahun", form.tahun);
-      let url = "/user/limbah-cair/data";
-      let responsenya = await api.post(url, dataForm);
       
-      console.log('Full Response:', responsenya.data);
+      console.log('Sending request with tahun:', form.tahun);
+      const responsenya = await api.post("/user/limbah-cair/data", dataForm);
       
-      // Get limbah cair data from response
-      let tmpDataLimbahCair = responsenya.data.data?.values || responsenya.data.data || [];
-      console.log('Limbah Cair Data:', tmpDataLimbahCair);
+      // Debug: Log the full response structure
+      console.log('Full API Response:', responsenya);
+      console.log('Response data:', responsenya.data);
       
-      // Process data for chart - group by month and calculate averages
-      const monthlyData = Array(12).fill(null).map(() => ({
-        ph: [] as number[],
-        bod: [] as number[],
-        cod: [] as number[],
-        tss: [] as number[],
-        minyak_lemak: [] as number[],
-        amoniak: [] as number[],
-        total_coliform: [] as number[],
-        debit_air_limbah: [] as number[]
-      }));
+      // Fix: Handle the correct API response structure
+      let tmpDataLimbahCair: LimbahCairData[] = [];
       
-      // Group data by month
-      if (Array.isArray(tmpDataLimbahCair)) {
-        tmpDataLimbahCair.forEach((item: any) => {
-          const monthIndex = (parseInt(item.periode) || 1) - 1;
-          if (monthIndex >= 0 && monthIndex < 12) {
-            const ph = parseFloat(item.ph);
-            const bod = parseFloat(item.bod);
-            const cod = parseFloat(item.cod);
-            const tss = parseFloat(item.tss);
-            const minyakLemak = parseFloat(item.minyak_lemak);
-            const amoniak = parseFloat(item.amoniak);
-            const totalColiform = parseFloat(item.total_coliform);
-            const debitAirLimbah = parseFloat(item.debit_air_limbah);
-            
-            // Only add non-zero and valid values
-            if (!isNaN(ph) && ph > 0) monthlyData[monthIndex].ph.push(ph);
-            if (!isNaN(bod) && bod > 0) monthlyData[monthIndex].bod.push(bod);
-            if (!isNaN(cod) && cod > 0) monthlyData[monthIndex].cod.push(cod);
-            if (!isNaN(tss) && tss > 0) monthlyData[monthIndex].tss.push(tss);
-            if (!isNaN(minyakLemak) && minyakLemak > 0) monthlyData[monthIndex].minyak_lemak.push(minyakLemak);
-            if (!isNaN(amoniak) && amoniak > 0) monthlyData[monthIndex].amoniak.push(amoniak);
-            if (!isNaN(totalColiform) && totalColiform > 0) monthlyData[monthIndex].total_coliform.push(totalColiform);
-            if (!isNaN(debitAirLimbah) && debitAirLimbah > 0) monthlyData[monthIndex].debit_air_limbah.push(debitAirLimbah);
-          }
-        });
+      if (responsenya.data?.data?.values) {
+        tmpDataLimbahCair = Array.isArray(responsenya.data.data.values) 
+          ? responsenya.data.data.values 
+          : [];
+      } else if (responsenya.data?.values) {
+        tmpDataLimbahCair = Array.isArray(responsenya.data.values) 
+          ? responsenya.data.values 
+          : [];
+      } else if (Array.isArray(responsenya.data?.data)) {
+        tmpDataLimbahCair = responsenya.data.data;
+      } else {
+        tmpDataLimbahCair = [];
       }
       
-      // Calculate averages for each month, return null for months with no data
-      const calculateAverage = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+      console.log('Processed tmpDataLimbahCair:', tmpDataLimbahCair);
+      console.log('Is array?', Array.isArray(tmpDataLimbahCair));
+      console.log('Length:', tmpDataLimbahCair.length);
+
+      // Store original data for tooltip
+      setOriginalData(tmpDataLimbahCair);
+
+      // Process and update chart data
+      console.log('About to process chart data with:', tmpDataLimbahCair);
+      const processedSeries = processChartData(tmpDataLimbahCair);
+      console.log('Processed Series:', processedSeries);
+      console.log('Series Length:', processedSeries.length);
       
-      console.log('Monthly Data:', monthlyData);
-      
-      // Format data untuk ApexCharts menggunakan data yang sudah diproses
-      const allSeries = [
-        {
-          name: "pH",
-          data: monthlyData.map(month => calculateAverage(month.ph)),
-          color: '#FF6B6B'
-        },
-        {
-          name: "BOD (mg/l)",
-          data: monthlyData.map(month => calculateAverage(month.bod)),
-          color: '#4ECDC4'
-        },
-        {
-          name: "COD (mg/l)",
-          data: monthlyData.map(month => calculateAverage(month.cod)),
-          color: '#45B7D1'
-        },
-        {
-          name: "TSS (mg/l)",
-          data: monthlyData.map(month => calculateAverage(month.tss)),
-          color: '#96CEB4'
-        },
-        {
-          name: "Minyak & Lemak (mg/l)",
-          data: monthlyData.map(month => calculateAverage(month.minyak_lemak)),
-          color: '#FFEAA7'
-        },
-        {
-          name: "Amoniak (mg/l)",
-          data: monthlyData.map(month => calculateAverage(month.amoniak)),
-          color: '#DDA0DD'
-        },
-        {
-          name: "Total Coliform (MPN/100ml)",
-          data: monthlyData.map(month => calculateAverage(month.total_coliform)),
-          color: '#FFA07A'
-        },
-        {
-          name: "Debit Air Limbah (M³/bulan)",
-          data: monthlyData.map(month => calculateAverage(month.debit_air_limbah)),
-          color: '#20B2AA'
-        }
-      ];
-      
-      // Filter out series that have no data (all null values)
-      const validatedDataLimbahCair = allSeries.filter(series => 
+      // Check if any series has data
+      const hasData = processedSeries.some(series => 
         series.data.some(value => value !== null && value !== undefined)
       );
+      console.log('Chart has data:', hasData);
       
-      console.log('Validated Data for Chart:', validatedDataLimbahCair);
-       setSeriesLimbahCair(validatedDataLimbahCair);
+      setSeries(processedSeries);
+
+      // Update reporting status and messages
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = form.tahun;
       
-      // Set chart title and message
-      const currentYear = form.tahun || new Date().getFullYear().toString();
-      const hasData = tmpDataLimbahCair && Array.isArray(tmpDataLimbahCair) && tmpDataLimbahCair.length > 0;
+      // Ensure tmpDataLimbahCair is an array before using find
+      const currentMonthReport = Array.isArray(tmpDataLimbahCair) 
+        ? tmpDataLimbahCair.find((item) => 
+            parseInt(item.periode) === currentMonth && parseInt(item.tahun) === parseInt(currentYear)
+          )
+        : null;
       
+      const sudahLapor = !!currentMonthReport;
+      const laporanPeriodeNama = new Date(0, currentMonth - 1).toLocaleString('id', { month: 'long' });
+      
+      // Set messages and titles
       let tmpPesan = "";
-      let tmpJudulChartLimbahCair = "";
-      
-      if (hasData) {
-        tmpPesan = `Data limbah cair ditemukan untuk tahun ${currentYear}`;
-        tmpJudulChartLimbahCair = `Parameter Limbah Cair Tahun ${currentYear}\n${userLoginStore.user?.nama_user || 'User'}`;
-        setLapor(true);
+      let tmpJudulChart = "";
+      if (sudahLapor) {
+        tmpPesan = `Anda Sudah Mengisi Laporan Pada Periode ${laporanPeriodeNama} ${currentYear}`;
+        tmpJudulChart = `Parameter Limbah Cair Tahun ${currentYear}
+       ${userLoginStore.user?.nama_user}`;
       } else {
-        tmpPesan = `Belum ada data limbah cair untuk tahun ${currentYear}`;
-        tmpJudulChartLimbahCair = `Parameter Limbah Cair Tahun ${currentYear}\n${userLoginStore.user?.nama_user || 'User'}`;
-        setLapor(false);
+        tmpPesan = `Anda Belum Mengisi Laporan Pada Periode ${laporanPeriodeNama} ${currentYear}`;
+        tmpJudulChart = `Parameter Limbah Cair Tahun ${currentYear}
+       ${userLoginStore.user?.nama_user}`;
       }
       
       setPesan(tmpPesan);
-      setJudulChartLimbahCair(tmpJudulChartLimbahCair);
+      setJudulChart(tmpJudulChart);
+      setLapor(sudahLapor);
       console.log(responsenya);
-      console.log(tmpJudulChartLimbahCair);
+      console.log(tmpJudulChart);
+
     } catch (e) {
       console.error(e);
     } finally {
@@ -358,7 +440,14 @@ const DashboardLimbahCairPage: React.FC = () => {
   };
 
   useEffect(() => {
+    // Initialize form with current year
+    const currentYear = new Date().getFullYear().toString();
+    setForm(prev => ({ ...prev, tahun: currentYear }));
+    formInstance.setFieldsValue({ form_tahun: currentYear });
+    
+    // Initial data fetch
     hitDashboard();
+    
     const handleResize = () => {
       // Periksa lebar layar dan atur lebar chart sesuai dengan kondisi tertentu
       if (window.innerWidth < 700) {
@@ -375,11 +464,40 @@ const DashboardLimbahCairPage: React.FC = () => {
     // Panggil handleResize saat komponen pertama kali dimuat
     handleResize();
 
-    // Hapus event listener saat komponen dibongkar
+    // Set up interval to check for date changes every minute
+    const dateCheckInterval = setInterval(() => {
+      const now = new Date();
+      const newMonth = now.getMonth() + 1;
+      const newYear = now.getFullYear();
+      
+      // Check if month or year has changed
+      if (newMonth !== currentDate.month || newYear !== currentDate.year) {
+        console.log('Date changed detected:', { 
+          old: currentDate, 
+          new: { month: newMonth, year: newYear } 
+        });
+        
+        // Update current date state
+        setCurrentDate({ month: newMonth, year: newYear });
+        
+        // Update form with new year if year changed
+        if (newYear !== currentDate.year) {
+          const newYearString = newYear.toString();
+          setForm(prev => ({ ...prev, tahun: newYearString }));
+          formInstance.setFieldsValue({ form_tahun: newYearString });
+        }
+        
+        // Refresh dashboard data
+        hitDashboard();
+      }
+    }, 60000); // Check every minute
+
+    // Hapus event listener dan interval saat komponen dibongkar
     return () => {
       window.removeEventListener("resize", handleResize);
+      clearInterval(dateCheckInterval);
     };
-  }, []);
+  }, [currentDate.month, currentDate.year]); // Add dependencies for date changes
 
   return (
     <MainLayout title={"Dashboard Limbah Cair"}>
@@ -406,12 +524,15 @@ const DashboardLimbahCairPage: React.FC = () => {
           </Space>
         </Form>
 
+        <br />
+
         {!lapor && (
           <Alert
             message="Pemberitahuan"
             description={pesan}
             type="warning"
             showIcon
+            style={{ marginBottom: 16 }}
           />
         )}
         {lapor && (
@@ -420,6 +541,7 @@ const DashboardLimbahCairPage: React.FC = () => {
             description={pesan}
             type="success"
             showIcon
+            style={{ marginBottom: 16 }}
           />
         )}
 
@@ -429,69 +551,21 @@ const DashboardLimbahCairPage: React.FC = () => {
             <Col>
               {typeof window !== undefined && (
                 <Chart
-                  options={optionsLimbahCair}
+                  options={getChartOptions()}
                   type="bar"
                   width={chartWidth}
                   height={chartHeight}
-                  series={seriesLimbahCair}
+                  series={series}
                 />
               )}
             </Col>
           </Row>
           
-          {/* Legend dengan Batas Maksimum */}
-          <div style={{ marginTop: 20, maxWidth: '800px', width: '100%' }}>
-            <h3 style={{ textAlign: 'center', marginBottom: '20px' }}>Keterangan Parameter dan Batas Maksimum</h3>
-            <Row gutter={[16, 16]}>
-              <Col xs={24} sm={12} md={8} lg={6}>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ width: '20px', height: '20px', backgroundColor: '#FF6B6B', marginRight: '8px', borderRadius: '3px' }}></div>
-                  <span><strong>pH:</strong> Batas 6-9</span>
-                </div>
-              </Col>
-              <Col xs={24} sm={12} md={8} lg={6}>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ width: '20px', height: '20px', backgroundColor: '#4ECDC4', marginRight: '8px', borderRadius: '3px' }}></div>
-                  <span><strong>BOD:</strong> Max 30 mg/l</span>
-                </div>
-              </Col>
-              <Col xs={24} sm={12} md={8} lg={6}>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ width: '20px', height: '20px', backgroundColor: '#45B7D1', marginRight: '8px', borderRadius: '3px' }}></div>
-                  <span><strong>COD:</strong> Max 100 mg/l</span>
-                </div>
-              </Col>
-              <Col xs={24} sm={12} md={8} lg={6}>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ width: '20px', height: '20px', backgroundColor: '#96CEB4', marginRight: '8px', borderRadius: '3px' }}></div>
-                  <span><strong>TSS:</strong> Max 30 mg/l</span>
-                </div>
-              </Col>
-              <Col xs={24} sm={12} md={8} lg={6}>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ width: '20px', height: '20px', backgroundColor: '#FFEAA7', marginRight: '8px', borderRadius: '3px' }}></div>
-                  <span><strong>Minyak & Lemak:</strong> Max 5 mg/l</span>
-                </div>
-              </Col>
-              <Col xs={24} sm={12} md={8} lg={6}>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ width: '20px', height: '20px', backgroundColor: '#DDA0DD', marginRight: '8px', borderRadius: '3px' }}></div>
-                  <span><strong>Amoniak:</strong> Max 10 mg/l</span>
-                </div>
-              </Col>
-              <Col xs={24} sm={12} md={8} lg={6}>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ width: '20px', height: '20px', backgroundColor: '#FFA07A', marginRight: '8px', borderRadius: '3px' }}></div>
-                  <span><strong>Total Coliform:</strong> Max 3000 MPN/100ml</span>
-                </div>
-              </Col>
-              <Col xs={24} sm={12} md={8} lg={6}>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ width: '20px', height: '20px', backgroundColor: '#20B2AA', marginRight: '8px', borderRadius: '3px' }}></div>
-                  <span><strong>Debit Air Limbah:</strong> M³/bulan</span>
-                </div>
-              </Col>
-            </Row>
+          {/* Keterangan Satuan Data */}
+          <div style={{ marginTop: 20, textAlign: 'center', padding: '16px', backgroundColor: '#f0f2f5', borderRadius: '8px', maxWidth: '600px' }}>
+            <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>
+              <strong>Keterangan:</strong> Data limbah cair menggunakan berbagai satuan: pH (tanpa satuan), BOD/COD/TSS/Minyak & Lemak/Amoniak dalam <strong>mg/l</strong>, Total Coliform dalam <strong>MPN/100ml</strong>, dan Debit Air Limbah dalam <strong>M³/bulan</strong>
+            </p>
           </div>
         </div>
       </Spin>

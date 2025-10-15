@@ -34,7 +34,7 @@ import { Card } from "antd";
 import { RcFile } from "antd/es/upload";
 import api from "@/utils/HttpRequest";
 import { useLaporanBulananStore } from "@/stores/laporanBulananStore";
-import router from "next/router";
+import router, { useRouter } from "next/router";
 import { useGlobalStore } from "@/stores/globalStore";
 import apifile from "@/utils/HttpRequestFile";
 import Notif from "@/utils/Notif";
@@ -64,6 +64,7 @@ const tabListNoTitle = [
 const FormViewLaporanCair: React.FC = () => {
   const globalStore = useGlobalStore();
   const laporanBulananStore = useLaporanBulananStore();
+  const router = useRouter();
 
   let tmpForm = {
     oldid: "",
@@ -205,18 +206,21 @@ const FormViewLaporanCair: React.FC = () => {
   };
 
   useLayoutEffect(() => {
-    // Get ID from laporanBulananStore - check for limbah cair specific ID first
-    const id = laporanBulananStore.id_limbah_cair || laporanBulananStore.id_laporan_bulanan;
+    // Get ID from URL query parameters first, fallback to laporanBulananStore
+    const urlId = router.query.id as string;
+    const storeId = laporanBulananStore.id_limbah_cair || laporanBulananStore.id_laporan_bulanan;
+    const id = urlId || storeId;
     
+    console.log("ID from URL query:", urlId);
     console.log("ID from laporanBulananStore (limbah cair):", laporanBulananStore.id_limbah_cair);
     console.log("ID from laporanBulananStore (laporan bulanan):", laporanBulananStore.id_laporan_bulanan);
     console.log("Using ID:", id);
     console.log("Full laporanBulananStore:", laporanBulananStore);
     
-    if (id && id !== 0) {
+    if (id && id !== 0 && id !== "0") {
       getLimbahCairDetail(id.toString());
     } else {
-      console.log("No valid ID in laporanBulananStore, checking if we can use basic data from store");
+      console.log("No valid ID found, checking if we can use basic data from store");
       // Try to use data from laporanBulananStore if available
       if (laporanBulananStore.nama_transporter || laporanBulananStore.limbah_cair_b3) {
         setForm({
@@ -236,7 +240,7 @@ const FormViewLaporanCair: React.FC = () => {
         });
       }
     }
-  }, [laporanBulananStore.id_limbah_cair, laporanBulananStore.id_laporan_bulanan, laporanBulananStore.nama_transporter, laporanBulananStore.limbah_cair_b3]);
+  }, [router.query.id, laporanBulananStore.id_limbah_cair, laporanBulananStore.id_laporan_bulanan, laporanBulananStore.nama_transporter, laporanBulananStore.limbah_cair_b3]);
 
   const contentListNoTitle: Record<string, React.ReactNode> = {
     limbahCair: (
@@ -252,11 +256,6 @@ const FormViewLaporanCair: React.FC = () => {
               <td style={{ padding: "8px", fontWeight: "bold" }}>Tahun</td>
               <td style={{ padding: "8px" }}>:</td>
               <td style={{ padding: "8px" }}>{form.tahun}</td>
-            </tr>
-            <tr>
-              <td style={{ padding: "8px", fontWeight: "bold" }}>Nama Transporter</td>
-              <td style={{ padding: "8px" }}>:</td>
-              <td style={{ padding: "8px" }}>{form.nama_transporter}</td>
             </tr>
             
             <tr>
@@ -345,7 +344,7 @@ const FormViewLaporanCair: React.FC = () => {
               </td>
             </tr>
             <tr>
-              <td style={{ padding: "8px", fontWeight: "bold" }}>Link Uji Lab Cair</td>
+              <td style={{ padding: "8px", fontWeight: "bold" }}>Link Pemeriksaan Limbah Cair</td>
               <td style={{ padding: "8px" }}>:</td>
               <td style={{ padding: "8px" }}>
                 <Button

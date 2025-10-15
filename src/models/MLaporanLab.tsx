@@ -12,16 +12,13 @@ export type JenisPemeriksaan = typeof JENIS_PEMERIKSAAN[keyof typeof JENIS_PEMER
 export interface MLaporanLab {
   id_laporan_lab?: number;
   id_user?: string;
-  nama_lab?: string;
-  jenis_pemeriksaan?: JenisPemeriksaan;
-  total_pemeriksaan?: number;
-  parameter_uji?: string | ParameterUji;
-  hasil_uji?: string | HasilUji;
-  metode_analisis?: string;
+  // Actual database fields based on current structure
+  kualitas_udara?: string;
+  kualitas_air?: string;
+  kualitas_makanan?: string;
+  usap_alat_medis_linen?: string;
+  limbah_cair?: string;
   catatan?: string;
-  link_sertifikat_lab?: string;
-  link_hasil_uji?: string;
-  link_dokumen_pendukung?: string;
   periode?: string;
   periode_nama?: string;
   tahun?: string;
@@ -33,6 +30,17 @@ export interface MLaporanLab {
   created_at?: string;
   updated_at?: string;
   user?: User;
+  
+  // Legacy fields for backward compatibility (may not exist in database)
+  nama_lab?: string;
+  jenis_pemeriksaan?: JenisPemeriksaan;
+  total_pemeriksaan?: number;
+  parameter_uji?: string | ParameterUji;
+  hasil_uji?: string | HasilUji;
+  metode_analisis?: string;
+  link_sertifikat_lab?: string;
+  link_hasil_uji?: string;
+  link_dokumen_pendukung?: string;
   
   // Helper functions
   simpenSementara?: Function;

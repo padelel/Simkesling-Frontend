@@ -179,12 +179,6 @@ const DashboardLimbahPadatPage: React.FC = () => {
           if (tmpData && Array.isArray(tmpData) && tmpData.length > 0) {
             for (const item of tmpData) {
               if (item && item.name) {
-                // Filter out series that contain "limbah cair" or "cair"
-                const itemName = String(item.name).toLowerCase();
-                if (itemName.includes('limbah cair') || itemName.includes('cair')) {
-                  continue; // Skip this series
-                }
-                
                 const cleanData = [];
                 
                 if (Array.isArray(item.data) && item.data.length > 0) {

@@ -98,16 +98,7 @@ const Index: React.FC = () => {
       sorter: (a: any, b: any) => a.tahun.localeCompare(b.tahun),
     },
     {
-      title: "Nama Transporter",
-      dataIndex: "namaTransporter",
-      defaultSortOrder: "ascend",
-      sorter: (a: any, b: any) =>
-        a.namaTransporter
-          .toUpperCase()
-          .localeCompare(b.namaTransporter.toUpperCase()),
-    },
-    {
-      title: "Berat Limbah Total (Liter)",
+      title: "Berat Limbah Total (M³/Bulan)",
       dataIndex: "volume",
       sorter: (a: any, b: any) => a.volume - b.volume,
     },
@@ -291,10 +282,6 @@ const Index: React.FC = () => {
   const doSearch = () => {
     const tmpData = data2.filter((val: any) => {
       if (
-        val.namaTransporter
-          .toString()
-          .toLowerCase()
-          .includes(search.toLowerCase()) ||
         val.periode.toString().toLowerCase().includes(search.toLowerCase()) ||
         val.tahun.toString().toLowerCase().includes(search.toLowerCase())
       ) {
@@ -321,7 +308,7 @@ const Index: React.FC = () => {
             value={search}
             style={{ boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.2)" }}
             name="search"
-            placeholder="Cari Berdasarkan Nama Transporter, Periode, atau Tahun"
+            placeholder="Cari Berdasarkan Periode atau Tahun"
           />
         </Col>
         <Col>

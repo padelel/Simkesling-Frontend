@@ -26,6 +26,8 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+
+  transpilePackages: ['react-apexcharts', 'apexcharts'],
 };
 
 module.exports = nextConfig;

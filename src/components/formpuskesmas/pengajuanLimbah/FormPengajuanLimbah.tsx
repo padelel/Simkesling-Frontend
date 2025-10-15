@@ -98,6 +98,7 @@ const FormPengajuanLimbah: React.FC = () => {
   const laporanBulananStore = useLaporanBulananStore();
   const [linkUploadManifest, setlinkUploadManifest] = useState("");
   const [linkUploadLogbook, setlinkLogbook] = useState("");
+  const [isEditMode, setIsEditMode] = useState(false);
   const [linkUploadLabLain, setlinkLabLain] = useState("");
   const [linkUploadLingkungan, setlinkDokLingkungan] = useState("");
   const [linkUploadSwaPantau, setlinkSwaPantau] = useState("");
@@ -152,7 +153,6 @@ const FormPengajuanLimbah: React.FC = () => {
     berat_limbah_total: "",
     limbah_b3_covid: "",
     limbah_b3_nonmedis: "",
-    limbah_cair_b3: "", // Field baru untuk limbah cair B3
     catatan: "",
     link_input_manifest: "",
     link_input_logbook: "",
@@ -162,6 +162,7 @@ const FormPengajuanLimbah: React.FC = () => {
     link_input_ujilab_cair: "-",
     limbah_jarum: "-",
     limbah_padat_infeksius: "-",
+    debit_limbah_cair: "", // Field untuk debit limbah cair (L)
   };
 
   const [form, setForm] = useState(cloneDeep(tmpForm));
@@ -171,10 +172,10 @@ const FormPengajuanLimbah: React.FC = () => {
     const covid = parseFloat(form.limbah_b3_covid) || 0;
     const nonmedis = parseFloat(form.limbah_b3_nonmedis) || 0;
     const jarum = parseFloat(form.limbah_jarum) || 0;
-    const cairB3 = parseFloat(form.limbah_cair_b3) || 0; // Tambah limbah cair B3
     const infeksius = parseFloat(form.limbah_padat_infeksius) || 0;
+    const cairB3 = parseFloat(form.debit_limbah_cair) || 0;
     
-    const total = parseFloat((covid + nonmedis + jarum + cairB3 + infeksius).toFixed(2));
+    const total = parseFloat((covid + nonmedis + jarum + infeksius + cairB3).toFixed(2));
     
     setForm(prev => ({
       ...prev,
@@ -187,7 +188,7 @@ const FormPengajuanLimbah: React.FC = () => {
         form_beratLimbah: total.toString()
       });
     }
-  }, [form.limbah_b3_covid, form.limbah_b3_nonmedis, form.limbah_jarum, form.limbah_cair_b3, form.limbah_padat_infeksius]);
+  }, [form.limbah_b3_covid, form.limbah_b3_nonmedis, form.limbah_jarum, form.limbah_padat_infeksius, form.debit_limbah_cair]);
 
   const beforeUploadFileDynamic = (file: RcFile) => {
     return false;
@@ -305,7 +306,9 @@ const FormPengajuanLimbah: React.FC = () => {
     // dataForm.append("ukuran_pemusnahan_sendiri", form.ukuranpemusnah);
     dataForm.append("limbah_b3_covid", form.limbah_b3_covid);
     dataForm.append("limbah_b3_nonmedis", form.limbah_b3_nonmedis);
-    dataForm.append("limbah_cair_b3", form.limbah_cair_b3); // Field baru untuk limbah cair B3
+    dataForm.append("limbah_b3_medis", "0"); // Field untuk limbah B3 medis
+    dataForm.append("limbah_sludge_ipal", "0"); // Field untuk limbah sludge IPAL
+    dataForm.append("debit_limbah_cair", form.debit_limbah_cair); // Field untuk debit limbah cair (L)
     dataForm.append("catatan", form.catatan);
     dataForm.append("tahun", parseInt(form.tahun));
     dataForm.append("periode", parseInt(form.periode));
@@ -496,6 +499,9 @@ const FormPengajuanLimbah: React.FC = () => {
     console.log(laporanBulananStore);
     console.log(router.query.action);
 
+    // Set edit mode state
+    setIsEditMode(action === "edit");
+
     formInstance.resetFields();
     setForm(cloneDeep(tmpForm));
     setLimbahPadatList([]);
@@ -517,7 +523,7 @@ const FormPengajuanLimbah: React.FC = () => {
         laporanBulananStore.id_laporan_bulanan == 0
       ) {
         console.log("masuk sini? #2");
-        router.push("/dashboard/user/limbah");
+        router.push("/dashboard/user/limbah-padat");
         return;
       }
       // jika edit set valuenya
@@ -546,7 +552,6 @@ const FormPengajuanLimbah: React.FC = () => {
           laporanBulananStore.berat_limbah_total?.toString() ?? "",
         limbah_b3_covid: laporanBulananStore.limbah_b3_covid?.toString() ?? "",
         limbah_b3_nonmedis: laporanBulananStore.limbah_b3_nonmedis?.toString() ?? "",
-        limbah_cair_b3: laporanBulananStore.limbah_cair_b3?.toString() ?? "",
         catatan: laporanBulananStore.catatan?.toString() ?? "",
         link_input_manifest:
           laporanBulananStore.link_input_manifest?.toString() ?? "",
@@ -564,6 +569,7 @@ const FormPengajuanLimbah: React.FC = () => {
         limbah_jarum: laporanBulananStore.limbah_jarum?.toString() ?? "",
         limbah_padat_infeksius:
           laporanBulananStore.limbah_padat_infeksius?.toString() ?? "",
+        debit_limbah_cair: laporanBulananStore.debit_limbah_cair?.toString() ?? "",
       };
       
       console.log("Edit form data from store:", editFormData);
@@ -596,6 +602,8 @@ const FormPengajuanLimbah: React.FC = () => {
           laporanBulananStore.limbah_jarum?.toString() ?? "",
         form_beratLimbahCairB3:
           laporanBulananStore.limbah_cair_b3?.toString() ?? "",
+        form_debitLimbah:
+          laporanBulananStore.debit_limbah_cair?.toString() ?? "",
         form_catatan: laporanBulananStore.catatan?.toString() ?? "",
         form_link_input_manifest:
           laporanBulananStore.link_input_manifest?.toString() ?? "",
@@ -769,13 +777,13 @@ const FormPengajuanLimbah: React.FC = () => {
         </Form.Item>
         
         <Form.Item
-          name="form_beratLimbahCairB3"
+          name="form_debitLimbah"
           label="Total Limbah Cair B3"
           rules={[]}
         >
           <InputNumber
-            onChange={(v) => handleChangeSelect(v, "limbah_cair_b3", event)}
-            value={form.limbah_cair_b3}
+            onChange={(v) => handleChangeSelect(v, "debit_limbah_cair", event)}
+            value={form.debit_limbah_cair}
             style={inputNumberStyles}
             min={0.0}
             defaultValue={0.0}
@@ -938,30 +946,30 @@ const FormPengajuanLimbah: React.FC = () => {
           showIcon
         />
         <Form.Item
-          name="form_link_input_manifest"
-          label="Link Manifest"
-          rules={[
-            {
-              required: form.link_input_manifest.length < 1,
-            },
-          ]}
-        >
-          <Input
-            onChange={handleChangeInput}
-            // style={inputStyles}
-            value={form.link_input_manifest}
-            name="link_input_manifest"
-            style={inputStyles}
-          />
-          <Button
-            style={{ textDecoration: "underline" }}
-            onClick={() => window.open(linkUploadManifest, "_blank")}
-            icon={<ExportOutlined />}
-            type="link"
+            name="form_link_input_manifest"
+            label="Link Manifest"
+            rules={[
+              {
+                required: form.link_input_manifest.length < 1,
+              },
+            ]}
           >
-            Klik Untuk Upload Dokumen Manifest
-          </Button>
-        </Form.Item>
+            <Input
+              onChange={handleChangeInput}
+              // style={inputStyles}
+              value={form.link_input_manifest}
+              name="link_input_manifest"
+              style={inputStyles}
+            />
+            <Button
+              style={{ textDecoration: "underline" }}
+              onClick={() => window.open('https://drive.google.com/drive/folders/1FBbOe2WUldZlaDVidPAfl2qJ_VvyOdMZ', '_blank')}
+              icon={<ExportOutlined />}
+              type="link"
+            >
+              Klik Untuk Upload Dokumen Manifest
+            </Button>
+          </Form.Item>
         <Form.Item
           name="form_link_input_logbook"
           label="Link Logbook"
@@ -980,7 +988,7 @@ const FormPengajuanLimbah: React.FC = () => {
           <Button
             style={{ textDecoration: "underline" }}
             icon={<ExportOutlined />}
-            onClick={() => window.open(linkUploadLogbook, "_blank")}
+            onClick={() => window.open('https://drive.google.com/drive/folders/1LEUP32SK-sxjuoROe1NPoL0MsTqSzJ7I', '_blank')}
             type="link"
           >
             Klik Untuk Upload Dokumen Logbook
@@ -1013,16 +1021,6 @@ const FormPengajuanLimbah: React.FC = () => {
             Klik Untuk Upload Dokumen Hasil Lab Lain
           </Button>
         </Form.Item>
-
-        <Divider />
-        {/* <Form.Item name="form_debitLimbah" label="Debit Limbah Cair (L)">
-          <Input
-            onChange={handleChangeInput}
-            name="debit_limbah_cair"
-            value={form.debit_limbah_cair}
-            style={inputStyles}
-          />
-        </Form.Item> */}
 
         <Form.Item name="form_catatan" label="Catatan">
           <TextArea
@@ -1146,6 +1144,7 @@ const FormPengajuanLimbah: React.FC = () => {
               placeholder="Pilih Bulan Periode"
               onChange={(v) => handleChangePeriode(v, "periode", event)}
               style={{ width: 200 }}
+              disabled={isEditMode}
               // onChange={handleChange}
               options={[
                 { value: "1", label: "Januari" },
@@ -1174,6 +1173,7 @@ const FormPengajuanLimbah: React.FC = () => {
               value={form.tahun}
               maxLength={4}
               name="tahun"
+              disabled={isEditMode}
             />
           </Form.Item>
         </Space>

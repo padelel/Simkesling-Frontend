@@ -151,7 +151,7 @@ const Index: React.FC = () => {
       dataIndex: "beratLimbahTotal",
       // defaultSortOrder: "descend",
       sorter: (a: any, b: any) =>
-        b.beratLimbahTotal.localeCompare(a.beratLimbahTotal),
+        parseFloat(b.beratLimbahTotal) - parseFloat(a.beratLimbahTotal),
     },
     {
       title: "Tanggal Dibuat",

@@ -28,7 +28,6 @@ import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import api from '@/utils/HttpRequest';
 import { useGlobalStore } from '@/stores/globalStore';
-import { MLaporanRekapitulasi, ResponseLaporanRekapitulasi } from '@/models/MLaporanRekapitulasi';
 
 const { Title, Text } = Typography;
 
@@ -36,18 +35,15 @@ interface MonthlyDetailData {
   key: string;
   bulan: string;
   periode: number;
-  berat_total: number;
-  limbah_b3_medis: number;
-  limbah_b3_nonmedis: number;
-  limbah_jarum: number;
-  limbah_sludge_ipal: number;
+  volume_total: number;
+  debit_air_limbah: number;
+  ph: number;
+  tss: number;
+  bod: number;
+  cod: number;
+  minyak_lemak: number;
+  amoniak: number;
   nama_transporter: string;
-  total_limbah_padat_infeksius: number;
-  total_limbah_covid: number;
-  total_limbah_padat_non_infeksius: number;
-  total_limbah_jarum: number;
-  total_sludge_ipal: number;
-  total_limbah_padat: number;
   status: 'Ada Laporan' | 'Tidak Ada Laporan';
   tanggal_laporan: string;
   persentase_dari_total: number;
@@ -60,13 +56,13 @@ interface FacilityInfo {
   alamat_tempat: string;
   kelurahan: string;
   kecamatan: string;
-  total_berat_tahunan: number;
+  total_volume_tahunan: number;
   total_laporan_tahunan: number;
   rata_rata_bulanan: number;
   persentase_kelengkapan: number;
 }
 
-const DetailLaporanLimbahPadat: React.FC = () => {
+const DetailLaporanLimbahCair: React.FC = () => {
   const router = useRouter();
   const { id, tahun } = router.query;
   const globalStore = useGlobalStore();
@@ -79,7 +75,7 @@ const DetailLaporanLimbahPadat: React.FC = () => {
   );
 
   // Fetch detailed data for specific facility
-  const fetchDetailData = async () => {
+const fetchDetailData = async () => {
     if (!id) return;
     
     try {
@@ -88,90 +84,83 @@ const DetailLaporanLimbahPadat: React.FC = () => {
       
       const formData = new FormData();
       formData.append('tahun', currentYear.toString());
+      // PENJELASAN: Mengirim filter kosong ini penting agar endpoint admin
+      // mengembalikan data SEMUA fasilitas, bukan hanya data admin yang login.
+      formData.append('nama_user', ''); 
       
-      // Use the correct API endpoint that matches the main page
-      const response = await api.post('/user/laporan-rekapitulasi/data', formData);
-      const responseData = response.data as ResponseLaporanRekapitulasi;
+      // KONFIRMASI: Anda sudah benar menggunakan endpoint admin ini
+      const response = await api.post('/user/limbah-cair/data', formData);
       
-      if (responseData.success) {
-        const apiData = responseData.data;
+      if (response.data && response.data.data) {
+        const apiData = response.data.data.values || [];
         
-        // Find the specific user from the response
         const targetUserId = parseInt(id as string);
-        let targetUser = null;
         
-        // Look for the user in the users array first
-        if (apiData.users && apiData.users.length > 0) {
-          targetUser = apiData.users.find(user => user.id_user === targetUserId);
-        }
+        // --- PERBAIKAN 1: LOGIKA FILTER ---
+        // Menggunakan '==' (perbandingan longgar) untuk mengatasi masalah "string" vs number.
+        const userReports = apiData.filter((item: any) => 
+          (item.id_user == targetUserId) || (item.user?.id_user == targetUserId)
+        );
         
-        // If not found in users, look in laporan.users
-        if (!targetUser && apiData.laporan && apiData.laporan.length > 0) {
-          for (const laporan of apiData.laporan) {
-            if (laporan.users && laporan.users.length > 0) {
-              const foundUser = laporan.users.find(user => user.id_user === targetUserId);
-              if (foundUser) {
-                targetUser = foundUser;
-                break;
-              }
+        // Bagian ini menangani jika fasilitas ada tapi belum pernah melapor sama sekali
+        if (userReports.length === 0) {
+          const allFacilitiesResponse = await api.post("/user/puskesmas-rumahsakit/data");
+          const allFacilities = allFacilitiesResponse.data.data.values || [];
+          const targetFacility = allFacilities.find((facility: any) => facility.id_user === targetUserId);
+          
+          if (targetFacility) {
+            setFacilityInfo({
+              id_user: targetFacility.id_user,
+              nama_fasilitas: targetFacility.nama_user || targetFacility.nama_tempat || 'Tidak Diketahui',
+              tipe_tempat: targetFacility.jenis_tempat || targetFacility.tipe_tempat || 'Tidak Diketahui',
+              alamat_tempat: targetFacility.alamat || '',
+              kelurahan: targetFacility.kelurahan || '',
+              kecamatan: targetFacility.kecamatan || '',
+              total_volume_tahunan: 0, total_laporan_tahunan: 0, rata_rata_bulanan: 0, persentase_kelengkapan: 0,
+            });
+            
+            const emptyMonthlyDetails: MonthlyDetailData[] = [];
+            const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+            for (let i = 1; i <= 12; i++) {
+                emptyMonthlyDetails.push({
+                    key: i.toString(), bulan: monthNames[i-1], periode: i, volume_total: 0, debit_air_limbah: 0, ph: 0, tss: 0, bod: 0, cod: 0, minyak_lemak: 0, amoniak: 0, nama_transporter: '-', status: 'Tidak Ada Laporan', tanggal_laporan: '-', persentase_dari_total: 0
+                });
             }
+            setMonthlyData(emptyMonthlyDetails);
+          } else {
+            message.error('Data fasilitas tidak ditemukan');
           }
-        }
-        
-        if (!targetUser) {
-          message.error('Data fasilitas tidak ditemukan');
           return;
         }
         
-        // Process facility info
+        // Proses info fasilitas dari laporan pertama yang ditemukan
+        const firstReport = userReports[0];
         setFacilityInfo({
-          id_user: targetUser.id_user,
-          nama_fasilitas: targetUser.nama_tempat || targetUser.nama_user || targetUser.username,
-          tipe_tempat: targetUser.tipe_tempat || 'Tidak Diketahui',
-          alamat_tempat: targetUser.alamat_tempat || '',
-          kelurahan: targetUser.kelurahan || '',
-          kecamatan: targetUser.kecamatan || '',
-          total_berat_tahunan: 0,
-          total_laporan_tahunan: 0,
-          rata_rata_bulanan: 0,
-          persentase_kelengkapan: 0,
+          id_user: targetUserId,
+          nama_fasilitas: firstReport.user?.nama_tempat || firstReport.user?.nama_user || 'Tidak Diketahui',
+          tipe_tempat: firstReport.user?.tipe_tempat || 'Tidak Diketahui',
+          alamat_tempat: firstReport.user?.alamat_tempat || '',
+          kelurahan: firstReport.user?.kelurahan || '',
+          kecamatan: firstReport.user?.kecamatan || '',
+          total_volume_tahunan: 0, total_laporan_tahunan: 0, rata_rata_bulanan: 0, persentase_kelengkapan: 0,
         });
         
-        // Process monthly data
+        // --- PERBAIKAN 2: LOGIKA PEMROSESAN DATA BULANAN ---
         const monthlyDetails: MonthlyDetailData[] = [];
-        const monthNames = [
-          'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-          'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-        ];
+        const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
         
-        let totalBeratTahunan = 0;
+        let totalVolumeTahunan = 0;
         let totalLaporanTahunan = 0;
         
-        // Create data for all 12 months
         for (let i = 1; i <= 12; i++) {
           const monthName = monthNames[i - 1];
+          // Cari laporan yang sesuai untuk bulan ke-i
+          const monthReport = userReports.find((report: any) => parseInt(report.periode) === i);
           
-          // Find data for this month and user
-          const monthReport = apiData.laporan?.find(lap => lap.periode === i);
-          const userInMonth = monthReport?.users?.find(u => u.id_user === targetUserId);
-          const limbahData = userInMonth && typeof userInMonth.limbah === 'object' && userInMonth.limbah !== null 
-            ? userInMonth.limbah 
-            : null;
+          const volumeTotal = monthReport ? parseFloat(monthReport.debit_air_limbah?.toString() || '0') : 0;
           
-          const beratTotal = limbahData ? parseFloat(limbahData.berat_limbah_total?.toString() || '0') || 0 : 0;
-          const limbahB3Medis = limbahData ? parseFloat(limbahData.limbah_b3_medis?.toString() || '0') || 0 : 0;
-          const limbahB3NonMedis = limbahData ? parseFloat(limbahData.limbah_b3_nonmedis?.toString() || '0') || 0 : 0;
-          const limbahJarum = limbahData ? parseFloat(limbahData.limbah_jarum?.toString() || '0') || 0 : 0;
-          const limbahSludge = limbahData ? parseFloat(limbahData.limbah_sludge_ipal?.toString() || '0') || 0 : 0;
-          
-          // Get additional data for Total Limbah Padat Infeksius and Total Limbah Covid
-          const limbahCovid = limbahData ? parseFloat(limbahData.limbah_b3_covid?.toString() || '0') || 0 : 
-                             (userInMonth ? parseFloat(userInMonth.limbah_covid?.toString() || '0') || 0 : 0);
-          const totalLimbahPadatInfeksius = limbahData ? parseFloat(limbahData.limbah_padat_infeksius?.toString() || '0') || 0 : 0;
-          const totalLimbahCovid = limbahCovid;
-          
-          if (beratTotal > 0) {
-            totalBeratTahunan += beratTotal;
+          if (volumeTotal > 0) {
+            totalVolumeTahunan += volumeTotal;
             totalLaporanTahunan += 1;
           }
           
@@ -179,75 +168,47 @@ const DetailLaporanLimbahPadat: React.FC = () => {
             key: i.toString(),
             bulan: monthName,
             periode: i,
-            berat_total: beratTotal,
-            limbah_b3_medis: limbahB3Medis,
-            limbah_b3_nonmedis: limbahB3NonMedis,
-            limbah_jarum: limbahJarum,
-            limbah_sludge_ipal: limbahSludge,
-            nama_transporter: limbahData?.nama_transporter || 'Belum Ditentukan',
-            total_limbah_padat_infeksius: totalLimbahPadatInfeksius,
-            total_limbah_covid: totalLimbahCovid,
-            total_limbah_padat_non_infeksius: limbahB3NonMedis, // Using existing data for now
-            total_limbah_jarum: limbahJarum, // Using existing data
-            total_sludge_ipal: limbahSludge, // Using existing data
-            total_limbah_padat: beratTotal, // Using total weight
-            status: beratTotal > 0 ? 'Ada Laporan' : 'Tidak Ada Laporan',
-            tanggal_laporan: limbahData ? new Date(limbahData.created_at).toLocaleDateString('id-ID') : '-',
-            persentase_dari_total: 0 // Will be calculated after we have total
+            volume_total: volumeTotal,
+            debit_air_limbah: volumeTotal,
+            ph: monthReport ? parseFloat(monthReport.ph?.toString() || '0') : 0,
+            tss: monthReport ? parseFloat(monthReport.tss?.toString() || '0') : 0,
+            bod: monthReport ? parseFloat(monthReport.bod?.toString() || '0') : 0,
+            cod: monthReport ? parseFloat(monthReport.cod?.toString() || '0') : 0,
+            minyak_lemak: monthReport ? parseFloat(monthReport.minyak_lemak?.toString() || '0') : 0,
+            amoniak: monthReport ? parseFloat(monthReport.amoniak?.toString() || '0') : 0,
+            nama_transporter: monthReport?.transporter?.nama_transporter || 'Belum Ditentukan',
+            status: volumeTotal > 0 ? 'Ada Laporan' : 'Tidak Ada Laporan',
+            tanggal_laporan: monthReport ? dayjs(monthReport.created_at).format('DD/MM/YYYY') : '-',
+            persentase_dari_total: 0
           });
         }
         
-        // Calculate percentages and update facility info
-        const rataRataBulanan = totalLaporanTahunan > 0 ? totalBeratTahunan / totalLaporanTahunan : 0;
+        const rataRataBulanan = totalLaporanTahunan > 0 ? totalVolumeTahunan / totalLaporanTahunan : 0;
         const persentaseKelengkapan = Math.round((totalLaporanTahunan / 12) * 100);
         
         monthlyDetails.forEach(month => {
-          month.persentase_dari_total = totalBeratTahunan > 0 
-            ? Math.round((month.berat_total / totalBeratTahunan) * 100) 
-            : 0;
+          month.persentase_dari_total = totalVolumeTahunan > 0 ? Math.round((month.volume_total / totalVolumeTahunan) * 100) : 0;
         });
         
         setMonthlyData(monthlyDetails);
         
-        // Update facility info with calculated values
+        // Update info fasilitas dengan total yang sudah dihitung
         setFacilityInfo(prev => prev ? {
           ...prev,
-          total_berat_tahunan: totalBeratTahunan,
+          total_volume_tahunan: totalVolumeTahunan,
           total_laporan_tahunan: totalLaporanTahunan,
           rata_rata_bulanan: rataRataBulanan,
           persentase_kelengkapan: persentaseKelengkapan,
         } : null);
         
         message.success('Data detail berhasil dimuat');
+
       } else {
-        message.error('Gagal memuat data detail: ' + (responseData.message || 'Response tidak valid'));
+        message.error('Gagal memuat data detail: Format respons tidak valid');
       }
     } catch (error: any) {
       console.error('Error fetching detail data:', error);
-      let errorMessage = 'Terjadi kesalahan saat memuat data detail';
-      
-      if (error.response) {
-        const status = error.response.status;
-        const data = error.response.data;
-        
-        if (status === 401) {
-          errorMessage = 'Sesi telah berakhir, silakan login kembali';
-        } else if (status === 403) {
-          errorMessage = 'Anda tidak memiliki akses untuk melihat data ini';
-        } else if (status === 404) {
-          errorMessage = 'Data tidak ditemukan';
-        } else if (status === 500) {
-          errorMessage = 'Terjadi kesalahan pada server';
-        } else if (data && data.message) {
-          errorMessage = data.message;
-        }
-      } else if (error.request) {
-        errorMessage = 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      message.error(errorMessage);
+      message.error('Terjadi kesalahan saat memuat data detail');
     } finally {
       setLoading(false);
       if (globalStore.setLoading) globalStore.setLoading(false);
@@ -276,25 +237,36 @@ const DetailLaporanLimbahPadat: React.FC = () => {
       )
     },
     {
-      title: 'Berat Total (kg)',
-      dataIndex: 'berat_total',
-      key: 'berat_total',
+      title: 'Volume Total (L)',
+      dataIndex: 'volume_total',
+      key: 'volume_total',
       width: 130,
-      sorter: (a, b) => a.berat_total - b.berat_total,
+      sorter: (a, b) => a.volume_total - b.volume_total,
       render: (value) => (
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
             {value > 0 ? value.toLocaleString('id-ID', { minimumFractionDigits: 1 }) : '-'}
           </div>
-          <div style={{ fontSize: '11px', color: '#666' }}>kg</div>
+          <div style={{ fontSize: '11px', color: '#666' }}>L</div>
         </div>
       )
     },
     {
-      title: 'Total Limbah Padat Infeksius (kg)',
-      dataIndex: 'total_limbah_padat_infeksius',
-      key: 'total_limbah_padat_infeksius',
-      width: 180,
+      title: 'pH',
+      dataIndex: 'ph',
+      key: 'ph',
+      width: 80,
+      render: (value) => (
+        <div style={{ textAlign: 'center' }}>
+          {value > 0 ? value.toFixed(2) : '-'}
+        </div>
+      )
+    },
+    {
+      title: 'TSS (mg/L)',
+      dataIndex: 'tss',
+      key: 'tss',
+      width: 100,
       render: (value) => (
         <div style={{ textAlign: 'right' }}>
           {value > 0 ? value.toLocaleString('id-ID', { minimumFractionDigits: 1 }) : '-'}
@@ -302,9 +274,31 @@ const DetailLaporanLimbahPadat: React.FC = () => {
       )
     },
     {
-      title: 'Total Limbah Covid (kg)',
-      dataIndex: 'total_limbah_covid',
-      key: 'total_limbah_covid',
+      title: 'BOD (mg/L)',
+      dataIndex: 'bod',
+      key: 'bod',
+      width: 100,
+      render: (value) => (
+        <div style={{ textAlign: 'right' }}>
+          {value > 0 ? value.toLocaleString('id-ID', { minimumFractionDigits: 1 }) : '-'}
+        </div>
+      )
+    },
+    {
+      title: 'COD (mg/L)',
+      dataIndex: 'cod',
+      key: 'cod',
+      width: 100,
+      render: (value) => (
+        <div style={{ textAlign: 'right' }}>
+          {value > 0 ? value.toLocaleString('id-ID', { minimumFractionDigits: 1 }) : '-'}
+        </div>
+      )
+    },
+    {
+      title: 'Minyak & Lemak (mg/L)',
+      dataIndex: 'minyak_lemak',
+      key: 'minyak_lemak',
       width: 150,
       render: (value) => (
         <div style={{ textAlign: 'right' }}>
@@ -313,32 +307,10 @@ const DetailLaporanLimbahPadat: React.FC = () => {
       )
     },
     {
-      title: 'Total Limbah Padat Non Infeksius (kg)',
-      dataIndex: 'total_limbah_padat_non_infeksius',
-      key: 'total_limbah_padat_non_infeksius',
-      width: 200,
-      render: (value) => (
-        <div style={{ textAlign: 'right' }}>
-          {value > 0 ? value.toLocaleString('id-ID', { minimumFractionDigits: 1 }) : '-'}
-        </div>
-      )
-    },
-    {
-      title: 'Total Limbah Jarum (kg)',
-      dataIndex: 'total_limbah_jarum',
-      key: 'total_limbah_jarum',
-      width: 150,
-      render: (value) => (
-        <div style={{ textAlign: 'right' }}>
-          {value > 0 ? value.toLocaleString('id-ID', { minimumFractionDigits: 1 }) : '-'}
-        </div>
-      )
-    },
-    {
-      title: 'Total Sludge IPAL (kg)',
-      dataIndex: 'total_sludge_ipal',
-      key: 'total_sludge_ipal',
-      width: 150,
+      title: 'Amoniak (mg/L)',
+      dataIndex: 'amoniak',
+      key: 'amoniak',
+      width: 120,
       render: (value) => (
         <div style={{ textAlign: 'right' }}>
           {value > 0 ? value.toLocaleString('id-ID', { minimumFractionDigits: 1 }) : '-'}
@@ -420,12 +392,15 @@ const DetailLaporanLimbahPadat: React.FC = () => {
     <MainLayout>
       <div style={{ padding: '24px' }}>
         {/* Breadcrumb */}
-        <Breadcrumb style={{ marginBottom: '24px' }}>
-          <Breadcrumb.Item>Dashboard</Breadcrumb.Item>
-          <Breadcrumb.Item>Manajemen Laporan</Breadcrumb.Item>
-          <Breadcrumb.Item>Rekapitulasi Limbah Padat</Breadcrumb.Item>
-          <Breadcrumb.Item>Detail Laporan</Breadcrumb.Item>
-        </Breadcrumb>
+        <Breadcrumb 
+          style={{ marginBottom: '24px' }}
+          items={[
+            { title: 'Dashboard' },
+            { title: 'Manajemen Laporan' },
+            { title: 'Rekapitulasi Limbah Cair' },
+            { title: 'Detail Laporan' }
+          ]}
+        />
 
         {/* Header */}
         <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
@@ -441,7 +416,7 @@ const DetailLaporanLimbahPadat: React.FC = () => {
                     Kembali
                   </Button>
                   <Title level={3} style={{ margin: 0, display: 'inline' }}>
-                    Detail Laporan Limbah Padat {currentYear}
+                    Detail Laporan Limbah Cair {currentYear}
                   </Title>
                 </Col>
                 <Col>
@@ -501,10 +476,10 @@ const DetailLaporanLimbahPadat: React.FC = () => {
             <Col xs={24} sm={12} md={6}>
               <Card>
                 <Statistic
-                  title="Total Berat Tahunan"
-                  value={facilityInfo.total_berat_tahunan}
+                  title="Total Volume Tahunan"
+                  value={facilityInfo.total_volume_tahunan}
                   precision={1}
-                  suffix="kg"
+                  suffix="L"
                   valueStyle={{ color: '#1890ff' }}
                   prefix={<BarChartOutlined />}
                 />
@@ -527,7 +502,7 @@ const DetailLaporanLimbahPadat: React.FC = () => {
                   title="Rata-rata Bulanan"
                   value={facilityInfo.rata_rata_bulanan}
                   precision={1}
-                  suffix="kg"
+                  suffix="L"
                   valueStyle={{ color: '#faad14' }}
                 />
               </Card>
@@ -578,4 +553,4 @@ const DetailLaporanLimbahPadat: React.FC = () => {
   );
 };
 
-export default DetailLaporanLimbahPadat;
+export default DetailLaporanLimbahCair;

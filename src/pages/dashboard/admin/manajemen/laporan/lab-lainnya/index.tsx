@@ -5,10 +5,12 @@ import { Table } from "antd";
 import type { ColumnsType, TableProps } from "antd/es/table";
 import api from "@/utils/HttpRequest";
 import ModalView from "@/components/admin/laporan/ModalView";
+import { getLaporanLabData } from "../../../../../../api/laporan-lab";
 import { useRouter } from "next/router";
 import cloneDeep from "clone-deep";
 import { MLaporanBulanan } from "@/models/MLaporanBulanan";
 import { useLaporanBulananStore } from "@/stores/laporanBulananStore";
+import { useLaporanLabStore } from "@/stores/laporanLabStore";
 import {
   LoginOutlined,
   EditOutlined,
@@ -52,12 +54,9 @@ const groupRowStyles = `
 
 interface DataType {
   statusBerlaku: any;
-  status: any;
-  namaTransporter: any;
-  namaPemusnah: any;
+  status_laporan_lab: any;
   namaTempat: any;
-  tanggalPengajuan: any;
-  tanggalBerakhir: any;
+  tanggalDibuat: any;
   key: React.Key;
   name: string;
   age: number;
@@ -72,6 +71,7 @@ const ManajemenLaporanLimbahPadatPage: React.FC = () => {
   const router = useRouter();
   const globalStore = useGlobalStore();
   const laporanBulananStore = useLaporanBulananStore();
+  const laporanLabStore = useLaporanLabStore();
   const [groupedDataByYear, setGroupedDataByYear] = useState<{ [key: string]: DataType[] }>({});
   const [dataExport, setDataExport] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -100,39 +100,36 @@ const ManajemenLaporanLimbahPadatPage: React.FC = () => {
   }, []);
 
   // Memoize the getReportedMonths function to avoid recalculation on every render
-// Ganti fungsi lama dengan yang ini
 const getReportedMonths = useCallback((facilityData: any[]) => {
-  const reportedMonths = new Set<number>();
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-  const fullMonthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    const reportedMonths = new Set<number>();
+    const fullMonthNames = ['januari', 'februari', 'maret', 'april', 'mei', 'juni', 'juli', 'agustus', 'september', 'oktober', 'november', 'desember'];
 
-  facilityData.forEach(item => {
-    if (item.periode === null || item.periode === undefined) {
-      return; // Lewati jika periode null atau undefined
-    }
+    facilityData.forEach(item => {
+      // Lewati jika periode null, undefined, atau placeholder
+      if (item.periode === null || item.periode === undefined || item.isPlaceholder) {
+        return;
+      }
 
-    // Coba konversi periode ke angka terlebih dahulu
-    const periodeNum = parseInt(item.periode.toString(), 10);
+      // 1. Prioritaskan konversi ke angka
+      const periodeNum = parseInt(item.periode.toString(), 10);
 
-    // Jika hasilnya adalah angka yang valid antara 1 dan 12, gunakan itu
-    if (!isNaN(periodeNum) && periodeNum >= 1 && periodeNum <= 12) {
-      reportedMonths.add(periodeNum);
-      return; // Lanjut ke item berikutnya
-    }
+      // 2. Jika hasilnya adalah angka bulan yang valid, gunakan itu
+      if (!isNaN(periodeNum) && periodeNum >= 1 && periodeNum <= 12) {
+        reportedMonths.add(periodeNum);
+        return; // Lanjut ke item berikutnya
+      }
 
-    // Jika konversi ke angka gagal, baru coba parsing nama bulan (sebagai fallback)
-    const periodeStr = item.periode.toString().toLowerCase().trim();
-    const monthIndex = fullMonthNames.findIndex(month => 
-      month.toLowerCase() === periodeStr
-    );
+      // 3. Jika gagal, baru coba parsing nama bulan (sebagai fallback)
+      const periodeStr = item.periode.toString().toLowerCase().trim();
+      const monthIndex = fullMonthNames.findIndex(month => month === periodeStr);
 
-    if (monthIndex !== -1) {
-      reportedMonths.add(monthIndex + 1);
-    }
-  });
+      if (monthIndex !== -1) {
+        reportedMonths.add(monthIndex + 1);
+      }
+    });
 
-  return Array.from(reportedMonths).sort((a, b) => a - b);
-}, []);
+    return Array.from(reportedMonths).sort((a, b) => a - b);
+  }, []);
 
   // Memoize the renderMonthTags function to avoid recalculation on every render
   const renderMonthTags = useCallback((reportedMonths: number[]) => {
@@ -166,7 +163,7 @@ const getReportedMonths = useCallback((facilityData: any[]) => {
     // Group data by year and location
     const groupedData: { [key: string]: { [key: string]: any[] } } = {};
     
-    dataExport.forEach((item: any) => {
+    dataExport.forEach((item: any, index: number) => {
       let year: string;
       // Prioritize tahun column first, then fall back to date fields
       if (item.tahun) {
@@ -191,17 +188,16 @@ const getReportedMonths = useCallback((facilityData: any[]) => {
         groupedData[year][location] = [];
       }
       
-      groupedData[year][location].push({
-        key: item.id_laporan_bulanan || item.id || Math.random().toString(),
+      const processedItem = {
+        key: item.id_laporan_lab || item.id || Math.random().toString(),
         namaTempat: item.nama_user || item.user?.nama_user || '-',
-        namaTransporter: item.nama_transporter || item.transporter?.nama_transporter || '-',
-        totalLimbahPadat: item.berat_limbah_total || item.total_limbah_padat || '-',
         periode: item.periode || item.periode_nama || '-',
         tahun: item.tahun || year || '-',
-        tanggalPengajuan: item.tanggal_pengajuan || item.created_at || '-',
-        tanggalRevisi: item.tanggal_revisi || item.updated_at || '-',
+        tanggalDibuat: item.created_at || '-',
         ...item
-      });
+      };
+      
+      groupedData[year][location].push(processedItem);
     });
 
     // Process each year separately to ensure proper separation
@@ -211,6 +207,7 @@ const getReportedMonths = useCallback((facilityData: any[]) => {
       processedGroupedData[year] = [];
       
       const yearData = groupedData[year];
+      
       if (yearData && Object.keys(yearData).length > 0) {
         Object.keys(yearData).sort().forEach(location => {
           const facilityData = yearData[location];
@@ -219,27 +216,29 @@ const getReportedMonths = useCallback((facilityData: any[]) => {
             const reportedMonths = getReportedMonths(facilityData);
             
             // Add location group header with children
-            processedGroupedData[year].push({
+            const groupItem = {
               key: `group-${year}-${location}`,
               namaTempat: location,
               isGroup: true,
               reportedMonths: reportedMonths,
               facilityData: facilityData,
-              namaTransporter: '',
-              totalLimbahPadat: '',
+              namaLab: '',
+              jenisPemeriksaan: '',
+              totalPemeriksaan: '',
               periode: '',
               tahun: year,
-              tanggalPengajuan: '',
-              tanggalRevisi: '',
+              tanggalDibuat: '',
               name: '',
               age: 0,
               address: '',
               children: facilityData.map(item => ({
                 ...item,
-                key: item.key || item.id_laporan_bulanan || item.id || Math.random().toString(),
+                key: item.key || item.id_laporan_lab || item.id || Math.random().toString(),
                 tahun: year // Ensure year is correctly set
               }))
-            });
+            };
+            
+            processedGroupedData[year].push(groupItem);
           }
         });
       }
@@ -253,21 +252,9 @@ const getReportedMonths = useCallback((facilityData: any[]) => {
   }, [dataExport, getReportedMonths]);
 
   // Memoize event handlers to prevent unnecessary re-renders
-  // const onChange = useCallback((pagination: any, filters: any, sorter: any, extra: any) => {
-  //   console.log("params", pagination, filters, sorter, extra);
-    
-  //   // Handle pagination changes
-  //   if (pagination) {
-  //     if (pagination.current !== undefined) {
-  //       setCurrentPage(pagination.current);
-  //     }
-  //     if (pagination.pageSize !== undefined) {
-  //       setPageSize(pagination.pageSize);
-  //       // Reset to first page when page size changes
-  //       setCurrentPage(1);
-  //     }
-  //   }
-  // }, []);
+  const onChange: TableProps<DataType>['onChange'] = (pagination, filters, sorter, extra) => {
+    // Handle table changes if needed
+  };
 
   const handleExpand = useCallback((expanded: boolean, record: DataType) => {
     const keys = [...expandedRowKeys];
@@ -298,18 +285,18 @@ const getReportedMonths = useCallback((facilityData: any[]) => {
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = event.target;
-    setForm({
-      ...form,
+    setForm(prevForm => ({
+      ...prevForm,
       [name]: value,
-    });
-  }, [form]);
+    }));
+  }, []);
 
   const handleChangeSelect = useCallback((val: any, name: string, event: any) => {
-    setForm({
-      ...form,
+    setForm(prevForm => ({
+      ...prevForm,
       [name]: val,
-    });
-  }, [form]);
+    }));
+  }, []);
 
   // Year navigation functions
   const handlePreviousYear = () => {
@@ -331,24 +318,6 @@ const getReportedMonths = useCallback((facilityData: any[]) => {
   const getCurrentYearData = () => {
     return groupedDataByYear[currentYear.toString()] || [];
   };
-
-  // Memoize the paginated data to prevent recalculation on every render
-  const paginatedData = useMemo(() => {
-    // 1. Ambil semua data untuk tahun yang aktif
-    const currentYearData = groupedDataByYear[currentYear.toString()] || [];
-    
-    // 2. Jika tidak ada data, kembalikan array kosong
-    if (!currentYearData || currentYearData.length === 0) {
-        return [];
-    }
-    
-    // 3. Hitung indeks awal dan akhir untuk halaman saat ini
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    
-    // 4. Potong array data dan kembalikan hanya data untuk halaman ini
-    return currentYearData.slice(startIndex, endIndex);
-  }, [groupedDataByYear, currentYear, currentPage, pageSize]);
 
   const columns: ColumnsType<DataType> = [
     {
@@ -387,58 +356,15 @@ const getReportedMonths = useCallback((facilityData: any[]) => {
       onCell: (record) => {
         if (record.isYearGroup) {
           return {
-            colSpan: 9,
+            colSpan: 5,
             className: 'year-group-row'
           };
         }
         if (record.isGroup) {
           return {
-            colSpan: 9,
+            colSpan: 5,
             className: 'group-row'
           };
-        }
-        return {};
-      },
-    },
-    {
-      title: "Nama Transporter",
-      dataIndex: "namaTransporter",
-      key: "namaTransporter",
-      render: (text, record) => {
-        if (record.isGroup || record.isYearGroup) {
-          return null;
-        }
-        // Handle placeholder data
-        if (record.isPlaceholder || record.status === 'Belum Melapor') {
-          return <span style={{ color: '#999', fontStyle: 'italic' }}>Belum ada data</span>;
-        }
-        return text || '-';
-      },
-      onCell: (record) => {
-        if (record.isGroup || record.isYearGroup) {
-          return { colSpan: 0 };
-        }
-        return {};
-      },
-    },
-    {
-      title: "Total Limbah Padat (Kg)",
-      dataIndex: "totalLimbahPadat",
-      key: "totalLimbahPadat",
-      align: 'center' as const,
-      render: (text, record) => {
-        if (record.isGroup || record.isYearGroup) {
-          return null;
-        }
-        // Handle placeholder data
-        if (record.isPlaceholder || record.status === 'Belum Melapor') {
-          return <span style={{ color: '#999', fontStyle: 'italic' }}>Belum melapor</span>;
-        }
-        return text ? `${text} Kg` : '-';
-      },
-      onCell: (record) => {
-        if (record.isGroup || record.isYearGroup) {
-          return { colSpan: 0 };
         }
         return {};
       },
@@ -452,7 +378,7 @@ const getReportedMonths = useCallback((facilityData: any[]) => {
           return null;
         }
         // Handle placeholder data
-        if (record.isPlaceholder || record.status === 'Belum Melapor') {
+        if (record.isPlaceholder || record.status_laporan_lab === 'Belum Melapor') {
           return <span style={{ color: '#999', fontStyle: 'italic' }}>Belum melapor</span>;
         }
         // Convert number to month name if it's a number
@@ -488,36 +414,15 @@ const getReportedMonths = useCallback((facilityData: any[]) => {
       },
     },
     {
-      title: "Tanggal Pengajuan",
-      dataIndex: "tanggalPengajuan",
-      key: "tanggalPengajuan",
+      title: "Tanggal Dibuat",
+      dataIndex: "tanggalDibuat",
+      key: "tanggalDibuat",
       render: (text, record) => {
         if (record.isGroup || record.isYearGroup) {
           return null;
         }
         // Handle placeholder data
-        if (record.isPlaceholder || record.status === 'Belum Melapor') {
-          return <span style={{ color: '#999', fontStyle: 'italic' }}>Belum melapor</span>;
-        }
-        return parsingDate(text);
-      },
-      onCell: (record) => {
-        if (record.isGroup || record.isYearGroup) {
-          return { colSpan: 0 };
-        }
-        return {};
-      },
-    },
-    {
-      title: "Tanggal Revisi",
-      dataIndex: "tanggalRevisi",
-      key: "tanggalRevisi",
-      render: (text, record) => {
-        if (record.isGroup || record.isYearGroup) {
-          return null;
-        }
-        // Handle placeholder data
-        if (record.isPlaceholder || record.status === 'Belum Melapor') {
+        if (record.isPlaceholder || record.status_laporan_lab === 'Belum Melapor') {
           return <span style={{ color: '#999', fontStyle: 'italic' }}>Belum melapor</span>;
         }
         return parsingDate(text);
@@ -538,7 +443,7 @@ const getReportedMonths = useCallback((facilityData: any[]) => {
           return null;
         }
         // Handle placeholder data - show different action for facilities that haven't reported
-        if (record.isPlaceholder || record.status === 'Belum Melapor') {
+        if (record.isPlaceholder || record.status_laporan_lab === 'Belum Melapor') {
           return (
             <Space size="middle">
               <span style={{ color: '#999', fontStyle: 'italic' }}>Belum ada laporan</span>
@@ -567,189 +472,222 @@ const getReportedMonths = useCallback((facilityData: any[]) => {
   ];
 
   const handleView = useCallback((record: any) => {
-    if (laporanBulananStore.simpenSementara) {
-      laporanBulananStore.simpenSementara(record);
+    if (laporanLabStore.simpenSementara) {
+      laporanLabStore.simpenSementara(record);
     }
-    router.push("/dashboard/admin/manajemen/laporan/limbah-padat/ViewLaporan");
-  }, [laporanBulananStore, router]);
+    
+    // Build query parameters for filtering
+    const queryParams = new URLSearchParams();
+    if (record.periode) {
+      queryParams.set('periode', record.periode.toString());
+    }
+    if (record.tahun) {
+      queryParams.set('tahun', record.tahun.toString());
+    }
+    
+    const queryString = queryParams.toString();
+    const url = `/dashboard/admin/manajemen/laporan/lab-lainnya/ViewLaporan${queryString ? `?${queryString}` : ''}`;
+    
+    router.push(url);
+  }, [laporanLabStore, router]);
 
-  const getData = async () => {
+  const getData = useCallback(async () => {
     if (globalStore.setLoading) globalStore.setLoading(true);
     try {
       // Fetch all healthcare facilities first
       const allFacilitiesResponse = await api.post("/user/puskesmas-rumahsakit/data");
       const allFacilities = allFacilitiesResponse.data.data.values || [];
-      console.log('All Facilities:', allFacilities);
-
-      let dataForm: any = new FormData();
-      // Only append nama_user filter if it has value and is not just whitespace
+    
+      // Fetch lab reports data using the correct API
+      const params: any = {};
       if (form.nama_user && form.nama_user.trim()) {
-        dataForm.append("nama_user", form.nama_user.trim());
+        // Note: The backend API might need to be updated to support nama_user filtering
+        // For now, we'll fetch all data and filter on frontend
       }
       
-      let url = "/admin/laporan-bulanan/data";
-      let responsenya = await api.post(url, dataForm);
+      const responsenya = await getLaporanLabData(params);
       
-      console.log('API Response:', responsenya.data);
-      
-      // Handle different response structures
+      // Handle lab report response structure
       let rawData = [];
-      if (responsenya.data && responsenya.data.data && responsenya.data.data.values) {
-        rawData = responsenya.data.data.values;
-      } else if (responsenya.data && responsenya.data.data) {
-        rawData = Array.isArray(responsenya.data.data) ? responsenya.data.data : [responsenya.data.data];
-      } else if (responsenya.data && Array.isArray(responsenya.data)) {
+      if (responsenya && responsenya.data && responsenya.data.data && Array.isArray(responsenya.data.data)) {
+        rawData = responsenya.data.data;
+      } else if (responsenya && responsenya.data && Array.isArray(responsenya.data)) {
         rawData = responsenya.data;
+      } else if (responsenya && Array.isArray(responsenya)) {
+        rawData = responsenya;
       } else {
-        console.warn('Unexpected API response structure:', responsenya.data);
         rawData = [];
       }
-      
-      console.log('Raw Data:', rawData);
-      
-      // Create a map of facilities that have reported
-      const reportedFacilities = new Set();
-      const reportsByFacility: { [key: string]: any[] } = {};
-      const yearsInData = new Set<string>();
-      
-      rawData.forEach((item: any) => {
-        const facilityName = item.nama_user || item.user?.nama_user || 'Unknown';
-        reportedFacilities.add(facilityName);
-        
-        // Extract year from data
-        let year: string;
-        if (item.tahun) {
-          year = item.tahun.toString();
-        } else {
-          const dateField = item.tanggal_pengajuan || item.created_at || item.tanggal_laporan;
-          if (dateField) {
-            year = new Date(dateField).getFullYear().toString();
-          } else {
-            year = new Date().getFullYear().toString(); // Use current year as fallback
-          }
-        }
-        yearsInData.add(year);
-        
-        if (!reportsByFacility[facilityName]) {
-          reportsByFacility[facilityName] = [];
-        }
-        reportsByFacility[facilityName].push(item);
-      });
-      
-      // Create enhanced data that includes all facilities
-      const enhancedData = [...rawData];
-      
-      // Add entries for facilities that haven't reported for each year
-      const yearsArray = Array.from(yearsInData);
-      if (yearsArray.length === 0) {
-        yearsArray.push(new Date().getFullYear().toString()); // Use current year if no data
-      }
-      
-      // Filter facilities based on nama_user filter if provided
-      let filteredFacilities = allFacilities;
-      if (form.nama_user && form.nama_user.trim()) {
-        const searchTerm = form.nama_user.trim().toLowerCase();
-        filteredFacilities = allFacilities.filter((facility: any) => 
-          facility.nama_user && facility.nama_user.toLowerCase().includes(searchTerm)
-        );
-      }
-      
-      filteredFacilities.forEach((facility: any) => {
-        const facilityName = facility.nama_user;
-        
-        yearsArray.forEach(year => {
-          // Check if this facility has reported for this specific year
-          const hasReportedForYear = rawData.some((item: any) => {
-            const itemFacilityName = item.nama_user || item.user?.nama_user || 'Unknown';
-            let itemYear: string;
-            if (item.tahun) {
-              itemYear = item.tahun.toString();
-            } else {
-              const dateField = item.tanggal_pengajuan || item.created_at || item.tanggal_laporan;
-              if (dateField) {
-                itemYear = new Date(dateField).getFullYear().toString();
-              } else {
-                itemYear = new Date().getFullYear().toString(); // Use current year as fallback
-              }
-            }
-            return itemFacilityName === facilityName && itemYear === year;
-          });
-          
-          if (!hasReportedForYear) {
-            enhancedData.push({
-              id_laporan_bulanan: `placeholder_${facility.id_user}_${year}`,
-              nama_user: facilityName,
-              nama_transporter: 'Belum ada data',
-              berat_limbah_total: 0,
-              periode: 'Belum melapor',
-              tahun: year,
-              tanggal_pengajuan: null,
-              tanggal_revisi: null,
-              status: 'Belum Melapor',
-              isPlaceholder: true,
-              user: {
-                nama_user: facilityName
-              }
-            });
-          }
-        });
-      });
-      
-      // Also filter the enhanced data based on nama_user filter for better search results
-      let finalData = enhancedData;
-      if (form.nama_user && form.nama_user.trim()) {
-        const searchTerm = form.nama_user.trim().toLowerCase();
-        finalData = enhancedData.filter((item: any) => {
-          const facilityName = item.nama_user || item.user?.nama_user || '';
-          return facilityName.toLowerCase().includes(searchTerm);
-        });
-      }
-      
-      console.log('Final filtered data:', finalData);
-      
-      if (!Array.isArray(finalData) || finalData.length === 0) {
-        console.log('No data available after filtering - setting empty arrays');
-        setDataExport([]);
-        setGroupedDataByYear({});
-        return;
-      }
-      
-      setDataExport(finalData);
+       
+       // Filter by nama_user if provided (frontend filtering)
+       if (form.nama_user && form.nama_user.trim()) {
+         const searchTerm = form.nama_user.trim().toLowerCase();
+         const originalCount = rawData.length;
+         rawData = rawData.filter((item: any) => {
+           const facilityName = item.user?.nama_user || item.nama_user || '';
+           const matches = facilityName.toLowerCase().includes(searchTerm);
+           return matches;
+         });
+       }
+       
+       // Create a map of facilities that have reported
+       const reportedFacilities = new Set();
+       const reportsByFacility: { [key: string]: any[] } = {};
+       const yearsInData = new Set<string>();
+       
+       rawData.forEach((item: any) => {
+         const facilityName = item.user?.nama_user || item.nama_user || 'Unknown';
+         reportedFacilities.add(facilityName);
+         
+         // Extract year from lab data
+         let year: string;
+         if (item.tahun) {
+           year = item.tahun.toString();
+         } else {
+           const dateField = item.created_at || item.updated_at;
+           if (dateField) {
+             year = new Date(dateField).getFullYear().toString();
+           } else {
+             year = new Date().getFullYear().toString(); // Use current year as fallback
+           }
+         }
+         yearsInData.add(year);
+         
+         if (!reportsByFacility[facilityName]) {
+           reportsByFacility[facilityName] = [];
+         }
+         reportsByFacility[facilityName].push(item);
+       });
+       
+       // Create enhanced data that includes all facilities
+       const enhancedData = [...rawData];
+       
+       // Add entries for facilities that haven't reported for each year
+       const yearsArray = Array.from(yearsInData);
+       if (yearsArray.length === 0) {
+         yearsArray.push(new Date().getFullYear().toString()); // Use current year if no data
+       }
+       
+       // Filter facilities based on nama_user filter if provided
+       let filteredFacilities = allFacilities;
+       if (form.nama_user && form.nama_user.trim()) {
+         const searchTerm = form.nama_user.trim().toLowerCase();
+         const originalFacilityCount = filteredFacilities.length;
+         filteredFacilities = allFacilities.filter((facility: any) => 
+           facility.nama_user && facility.nama_user.toLowerCase().includes(searchTerm)
+         );
+       }
+       
+       let placeholderCount = 0;
+       filteredFacilities.forEach((facility: any) => {
+         const facilityName = facility.nama_user;
+         
+         yearsArray.forEach(year => {
+           // Check if this facility has reported for this specific year
+           const hasReportedForYear = rawData.some((item: any) => {
+             const itemFacilityName = item.user?.nama_user || item.nama_user || 'Unknown';
+             let itemYear: string;
+             if (item.tahun) {
+               itemYear = item.tahun.toString();
+             } else {
+               const dateField = item.created_at || item.updated_at;
+               if (dateField) {
+                 itemYear = new Date(dateField).getFullYear().toString();
+               } else {
+                 itemYear = new Date().getFullYear().toString(); // Use current year as fallback
+               }
+             }
+             return itemFacilityName === facilityName && itemYear === year;
+           });
+           
+           if (!hasReportedForYear) {
+             placeholderCount++;
+             enhancedData.push({
+               key: `placeholder-${facilityName}-${year}`,
+               id_laporan_lab: null,
+               id_user: null,
+               nama_user: facilityName,
+               periode: 'Belum melapor',
+               tahun: year,
+               created_at: null,
+               updated_at: null,
+               status_laporan_lab: 'Belum Melapor',
+               isPlaceholder: true,
+               user: {
+                 nama_user: facilityName
+               }
+             });
+           }
+         });
+       });
+       
+       // Also filter the enhanced data based on nama_user filter for better search results
+       let finalData = enhancedData;
+       if (form.nama_user && form.nama_user.trim()) {
+         const searchTerm = form.nama_user.trim().toLowerCase();
+         const beforeFilterCount = finalData.length;
+         finalData = enhancedData.filter((item: any) => {
+           const facilityName = item.nama_user || item.user?.nama_user || '';
+           return facilityName.toLowerCase().includes(searchTerm);
+         });
+       }
+       
+       if (!Array.isArray(finalData) || finalData.length === 0) {
+         setDataExport([]);
+         setGroupedDataByYear({});
+         return;
+       }
+       
+       setDataExport(finalData);
     } catch (e) {
-      console.error(e);
+      setDataExport([]);
     } finally {
       if (globalStore.setLoading) globalStore.setLoading(false);
     }
-  };
+  }, [form, api, getLaporanLabData]);
 
-  // Update state when processedData changes
+
+
+  // Effect to process data when dataExport changes
   useEffect(() => {
     if (processedData.processedGroupedData && Object.keys(processedData.processedGroupedData).length > 0) {
       setGroupedDataByYear(processedData.processedGroupedData);
       setAvailableYears(processedData.availableYears);
       
-      // Set current year to the latest available year if not already set or if current year has no data
-      if (processedData.availableYears.length > 0 && 
-          (!processedData.processedGroupedData[currentYear.toString()] || 
-           Object.keys(processedData.processedGroupedData[currentYear.toString()] || {}).length === 0)) {
-        setCurrentYear(processedData.availableYears[0]);
-      }
-      
-      // Reset expanded rows to ensure data starts collapsed
+      // Reset expanded rows when data changes
       setExpandedRowKeys([]);
       
       // Reset pagination to first page when data changes
       setCurrentPage(1);
+    } else {
+      setGroupedDataByYear({});
     }
-  }, [processedData, currentYear]);
+  }, [processedData]);
 
+  // Separate effect to handle year switching to prevent infinite loops
+  useEffect(() => {
+    if (processedData.processedGroupedData && Object.keys(processedData.processedGroupedData).length > 0) {
+      // Check if current year has data
+      const currentYearHasData = processedData.processedGroupedData[currentYear];
+      
+      // If current year has no data and there are available years, switch to the first available year
+      if (!currentYearHasData && processedData.availableYears.length > 0) {
+        const firstAvailableYear = processedData.availableYears[0];
+        if (firstAvailableYear !== currentYear) {
+          setCurrentYear(firstAvailableYear);
+        }
+      }
+    }
+  }, [processedData.processedGroupedData, processedData.availableYears]);
+
+  // Effect to fetch data on component mount
   useEffect(() => {
     getData();
-  }, []);
+  }, [getData]);
 
   return (
-    <MainLayout title="Manajemen Laporan Limbah B3">
-      <h2 style={{ textAlign: "center" }}>Manajemen Laporan Limbah B3</h2>
+    <MainLayout title="Manajemen Laporan Lab Lainnya">
+      <h2 style={{ textAlign: "center" }}>Manajemen Laporan Lab Lainnya</h2>
       
       <Form form={formInstance}>
         <Row gutter={16} style={{ marginBottom: 16 }}>
@@ -798,7 +736,7 @@ const getReportedMonths = useCallback((facilityData: any[]) => {
                       margin: '0',
                       color: 'white'
                     }}>
-                      🎯 Dashboard Laporan Limbah Padat {currentYear}
+                      🎯 Dashboard Laporan Lab Lainnya {currentYear}
                     </h1>
                     
                     {/* Year Navigation */}
@@ -876,8 +814,9 @@ const getReportedMonths = useCallback((facilityData: any[]) => {
                           // Count valid reports from facilityData
                           totalReports += item.facilityData.filter(report => 
                             report && 
-                            report.tanggalPengajuan && 
-                            !report.key?.toString().includes('placeholder')
+                            report.id_laporan_lab && // Check if it has a valid ID
+                            !report.key?.toString().includes('placeholder') && // Exclude placeholder entries
+                            !report.isPlaceholder // Exclude placeholder entries
                           ).length;
                         }
                       });
@@ -998,60 +937,58 @@ const getReportedMonths = useCallback((facilityData: any[]) => {
                   }}>
                     📋 Detail Laporan Tahun {currentYear}
                   </h2>
-              <Table
-                  columns={columns}
-                  dataSource={paginatedData}
-                  /* Properti onChange di level atas sudah dihapus */
-                  expandable={{
+                  <Table
+                    columns={columns}
+                    dataSource={getCurrentYearData()}
+                    onChange={onChange}
+                    expandable={{
                       expandedRowKeys: expandedRowKeys,
                       onExpand: (expanded, record) => handleExpand(expanded, record),
                       expandIcon: ({ expanded, onExpand, record }) => {
-                          if (record.isGroup) {
-                              return expanded ? (
-                                  <DownOutlined onClick={e => onExpand(record, e)} />
-                              ) : (
-                                  <RightOutlined onClick={e => onExpand(record, e)} />
-                              );
-                          }
-                          return null;
+                        if (record.isGroup) {
+                          return expanded ? (
+                            <DownOutlined onClick={e => onExpand(record, e)} />
+                          ) : (
+                            <RightOutlined onClick={e => onExpand(record, e)} />
+                          );
+                        }
+                        return null;
                       },
                       rowExpandable: (record) => record.isGroup,
                       childrenColumnName: 'children'
-                  }}
-                  pagination={{
+                    }}
+                    pagination={{
                       current: currentPage,
                       pageSize: pageSize,
-                      // Pastikan total dihitung dari data asli sebelum dipaginasi
-                      total: (groupedDataByYear[currentYear.toString()] || []).length,
+                      total: getCurrentYearData().length,
                       showSizeChanger: true,
                       showQuickJumper: true,
                       showTotal: (total, range) =>
-                          `${range[0]}-${range[1]} dari ${total} laporan`,
+                        `${range[0]}-${range[1]} dari ${total} laporan`,
                       pageSizeOptions: ['10', '15', '20', '50', '100'],
-                      // Handler ini sudah benar untuk mengubah ukuran halaman
                       onShowSizeChange: (current, size) => {
-                          setPageSize(size);
-                          setCurrentPage(1);
+                        setPageSize(size);
+                        setCurrentPage(1);
                       },
-                      // Handler ini sudah benar untuk mengubah halaman
                       onChange: (page, size) => {
-                          setCurrentPage(page);
-                          // Antd V5 menyarankan untuk tidak mengandalkan 'size' di sini,
-                          // cukup ubah halaman saja. 'onShowSizeChange' akan menangani perubahan ukuran.
-                          if (size && size !== pageSize) {
-                            setPageSize(size);
-                          }
+                        setCurrentPage(page);
+                        if (size !== pageSize) {
+                          setPageSize(size);
+                        }
                       }
-                  }}
-                  scroll={{ x: 1200 }}
-                  rowClassName={(record) => {
+                    }}
+                    scroll={{ x: 1200 }}
+                    rowClassName={(record) => {
                       if (record.isGroup) return 'group-row';
                       return 'detail-row';
-                  }}
-              />
+                    }}
+                  />
                 </div>
               </div>
             )}
+
+
+
       <Modal
         title="Detail Laporan"
         open={isModalOpen}

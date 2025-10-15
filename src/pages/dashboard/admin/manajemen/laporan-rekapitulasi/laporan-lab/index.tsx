@@ -54,13 +54,11 @@ interface RekapitulasiData {
   alamat_tempat: string;
   kelurahan: string;
   kecamatan: string;
-  volume_total: number;
   jumlah_laporan: number;
-  jumlah_laporan_lab?: number;
   periode: string;
   status: 'Lengkap' | 'Tidak Lengkap' | 'Terlambat';
   persentase_kepatuhan: number;
-  nama_transporter: string;
+  jenis_pemeriksaan: string[];
   tanggal_terakhir: string;
 }
 
@@ -71,26 +69,19 @@ interface YearlyFacilityData {
   alamat_tempat: string;
   kelurahan: string;
   kecamatan: string;
-  total_volume_tahunan: number;
+  total_pemeriksaan_tahunan: number;
   total_laporan_tahunan: number;
-  rata_rata_bulanan: number;
-  bulan_tertinggi: { bulan: string; volume: number };
-  bulan_terendah: { bulan: string; volume: number };
   persentase_kelengkapan: number;
-  status_tahunan: 'Sangat Baik' | 'Baik' | 'Cukup' | 'Kurang';
+  status_tahunan: string;
   detail_bulanan: Array<{
     periode: string;
-    volume: number;
+    pemeriksaan: number;
     status: string;
     tanggal: string;
   }>;
-  limbah_b3_medis_tahunan: number;
-  limbah_b3_nonmedis_tahunan: number;
-  limbah_jarum_tahunan: number;
-  limbah_sludge_ipal_tahunan: number;
 }
 
-const LaporanRekapitulasiLimbahCair: React.FC = () => {
+const LaporanRekapitulasiLaporanLab: React.FC = () => {
   const router = useRouter();
   const globalStore = useGlobalStore();
   const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear());
@@ -102,8 +93,7 @@ const LaporanRekapitulasiLimbahCair: React.FC = () => {
   const [data, setData] = useState<RekapitulasiData[]>([]);
   const [yearlyData, setYearlyData] = useState<YearlyFacilityData[]>([]);
 
-  // Calculate yearly data from raw facility data with individual reports
-const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
+  const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
     const yearlyResults: YearlyFacilityData[] = [];
 
     facilityData.forEach(facilityInfo => {
@@ -120,75 +110,38 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
         alamat_tempat: alamat_tempat,
         kelurahan: facilityInfo.kelurahan || 'Tidak Diketahui',
         kecamatan: facilityInfo.kecamatan || 'Tidak Diketahui',
-        total_volume_tahunan: 0,
+        total_pemeriksaan_tahunan: 0,
         total_laporan_tahunan: 0,
-        rata_rata_bulanan: 0,
-        bulan_tertinggi: { bulan: '-', volume: 0 },
-        bulan_terendah: { bulan: '-', volume: Number.MAX_VALUE },
         persentase_kelengkapan: 0,
         status_tahunan: 'Kurang',
-        detail_bulanan: [],
-        limbah_b3_medis_tahunan: 0,
-        limbah_b3_nonmedis_tahunan: 0,
-        limbah_jarum_tahunan: 0,
-        limbah_sludge_ipal_tahunan: 0
+        detail_bulanan: []
       };
 
-      let onTimeReportsCount = 0; // <-- TAMBAHAN: Counter untuk laporan tepat waktu
+      const totalReportsInYear = reports.length;
+      yearlyFacility.total_laporan_tahunan = totalReportsInYear;
+      yearlyFacility.total_pemeriksaan_tahunan = totalReportsInYear;
 
+      const monthlyReports = new Map<number, any[]>();
+      
       reports.forEach((report: any) => {
-        const volume = report.volume || 0;
-        const monthName = report.monthName || 'Tidak Diketahui';
+        const periode = report.periode || 0;
+        const monthName = report.periode_nama || `Bulan ${periode}` || 'Tidak Diketahui';
         
-        yearlyFacility.total_volume_tahunan += volume;
-        yearlyFacility.total_laporan_tahunan += 1;
-        
-        // --- LOGIKA KETEPATAN WAKTU DIMULAI DI SINI ---
-        const reportDate = dayjs(report.created_at || report.updated_at);
-        const reportPeriod = parseInt(report.periode);
-        let statusLaporan = 'Tidak Ada Laporan';
-
-        if (reportPeriod >= 1 && reportPeriod <= 12) {
-          // Deadline adalah tanggal 5 bulan berikutnya, pukul 23:59:59
-          // dayjs().month() adalah 0-11, jadi month(reportPeriod) adalah bulan berikutnya
-          const deadline = dayjs().year(currentYear).month(reportPeriod).date(5).endOf('day');
-          
-          if (reportDate.isBefore(deadline) || reportDate.isSame(deadline)) {
-            onTimeReportsCount++; // Laporan tepat waktu
-            statusLaporan = 'Tepat Waktu';
-          } else {
-            statusLaporan = 'Terlambat'; // Laporan ada tapi terlambat
-          }
+        if (!monthlyReports.has(periode)) {
+          monthlyReports.set(periode, []);
         }
-        // --- LOGIKA KETEPATAN WAKTU SELESAI ---
-
+        monthlyReports.get(periode)!.push(report);
+        
         yearlyFacility.detail_bulanan.push({
           periode: monthName,
-          volume: volume,
-          status: statusLaporan, // <-- PERUBAHAN
+          pemeriksaan: 1,
+          status: 'Ada Laporan',
           tanggal: report.created_at || report.updated_at || ''
         });
-        
-        if (volume > 0 && volume > yearlyFacility.bulan_tertinggi.volume) {
-          yearlyFacility.bulan_tertinggi = { bulan: monthName, volume: volume };
-        }
-        
-        if (volume > 0 && volume < yearlyFacility.bulan_terendah.volume) {
-          yearlyFacility.bulan_terendah = { bulan: monthName, volume: volume };
-        }
       });
 
-      if (yearlyFacility.bulan_terendah.volume === Number.MAX_VALUE) {
-        yearlyFacility.bulan_terendah = { bulan: '-', volume: 0 };
-      }
-
-      yearlyFacility.rata_rata_bulanan = yearlyFacility.total_laporan_tahunan > 0 
-        ? yearlyFacility.total_volume_tahunan / yearlyFacility.total_laporan_tahunan 
-        : 0;
-      
-      // --- PERUBAHAN KALKULASI PERSENTASE ---
-      // Dihitung dari laporan yang tepat waktu dibagi 12 bulan
-      yearlyFacility.persentase_kelengkapan = Math.round((onTimeReportsCount / 12) * 100);
+      const uniqueMonths = monthlyReports.size;
+      yearlyFacility.persentase_kelengkapan = Math.round((uniqueMonths / 12) * 100);
       
       if (yearlyFacility.persentase_kelengkapan >= 90) {
         yearlyFacility.status_tahunan = 'Sangat Baik';
@@ -216,13 +169,6 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
       const allFacilitiesResponse = await api.post("/user/puskesmas-rumahsakit/data");
       const allFacilities = allFacilitiesResponse.data.data.values || [];
       console.log('All Facilities:', allFacilities);
-      console.log('Total facilities count:', allFacilities.length);
-      
-      // Log detailed structure of first facility
-      if (allFacilities.length > 0) {
-        console.log('First facility structure:', allFacilities[0]);
-        console.log('First facility keys:', Object.keys(allFacilities[0]));
-      }
       
       // Create FormData for backend API call
       const formData = new FormData();
@@ -231,213 +177,119 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
         formData.append('periode', selectedPeriod);
       }
       
-      // Call actual backend API endpoint for limbah cair data
-      const response = await api.post('/user/limbah-cair/data', formData);
+      // Call actual backend API endpoint for laporan lab data (admin endpoint)
+      const response = await api.post('/admin/laporan-lab/data', formData);
+      console.log('Backend API Response (Laporan Lab):', response.data);
       
-      console.log('Backend API Response (Limbah Cair):', response.data);
-      
-      // Fetch lab report data
-      const labFormData = new FormData();
-      labFormData.append('tahun', currentYear.toString());
-      if (selectedPeriod !== 'all') {
-        labFormData.append('periode', selectedPeriod);
-      }
-      
-      const labResponse = await api.post('/user/laporan-lab/data', labFormData);
-      console.log('Backend API Response (Lab Reports):', labResponse.data);
-      
-      // Handle backend response structure for limbah cair
+      // Handle backend response structure - Fix for correct API response format
       let rawData = [];
-      if (response.data && response.data.data) {
-        rawData = response.data.data.values || response.data.data || [];
-      } else if (response.data && response.data.values) {
-        rawData = response.data.values;
+      if (response.data && response.data.data && response.data.data.data) {
+        rawData = response.data.data.data;
+      } else if (response.data && response.data.data) {
+        rawData = response.data.data;
       } else if (Array.isArray(response.data)) {
         rawData = response.data;
       }
       
-      // Handle lab report data
-      let labData = [];
-      if (labResponse.data && labResponse.data.data) {
-        labData = labResponse.data.data.values || labResponse.data.data || [];
-      } else if (labResponse.data && labResponse.data.values) {
-        labData = labResponse.data.values;
-      } else if (Array.isArray(labResponse.data)) {
-        labData = labResponse.data;
-      }
+      console.log('Raw laporan lab data:', rawData);
       
-      console.log('Raw limbah cair data:', rawData);
-      console.log('Raw lab report data:', labData);
+      // Group lab reports by facility
+      const facilityReportsMap = new Map<number, FacilityLabReports>();
       
-      // Transform API data to match table structure for limbah cair
-      const processedData: RekapitulasiData[] = [];
-      
-      // Group data by facility (id_user) to calculate aggregated values
-      const facilityMap = new Map<number, any>();
-      
-      // Process limbah cair data
       if (Array.isArray(rawData)) {
         rawData.forEach((item: any) => {
           const idUser = item.id_user || item.user?.id_user;
-          const facilityName = item.user?.nama_tempat || item.user?.nama_user || item.nama_fasilitas || 'Fasilitas Tidak Diketahui';
-          const facilityType = item.user?.tipe_tempat || 'Tidak Diketahui';
-          const alamat = item.user?.alamat_tempat || '';
-          const kelurahan = item.user?.kelurahan || '';
-          const kecamatan = item.user?.kecamatan || '';
-          const transporterName = item.transporter?.nama_transporter || item.nama_transporter || 'Tidak Ada Transporter';
           
-          // Calculate volume from debit_air_limbah
-          const volume = parseFloat(item.debit_air_limbah || '0') || 0;
+          // Extract facility information
+          const facilityName = item.nama_fasilitas || item.user?.nama_tempat || item.user?.nama_user || item.nama_tempat || 'Fasilitas Tidak Diketahui';
+          const facilityType = item.tipe_tempat || item.user?.tipe_tempat || 'Tidak Diketahui';
+          const alamat = item.alamat_tempat || item.user?.alamat_tempat || item.alamat || '';
+          const kelurahan = item.kelurahan || item.user?.kelurahan || '';
+          const kecamatan = item.kecamatan || item.user?.kecamatan || '';
           
-          // Extract month from periode or created_at date
-          let monthName = '';
-          const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
-                            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+          // Create lab report data with only essential fields
+          const labReport: LaporanLabData = {
+            key: `${idUser}-${item.id_laporan_lab || Date.now()}`,
+            id_laporan_lab: item.id_laporan_lab || 0,
+            id_user: idUser,
+            nama_fasilitas: facilityName,
+            tipe_tempat: facilityType,
+            alamat_tempat: alamat,
+            kelurahan: kelurahan,
+            kecamatan: kecamatan,
+            kualitas_udara: item.kualitas_udara || null,
+            kualitas_air: item.kualitas_air || null,
+            kualitas_makanan: item.kualitas_makanan || null,
+            usap_alat_medis: item.usap_alat_medis || null,
+            limbah_cair: item.limbah_cair || null,
+            catatan: item.catatan || null,
+            periode: item.periode || 0,
+            periode_nama: item.periode_nama || '',
+            tahun: item.tahun || currentYear,
+            created_at: item.created_at || '',
+            updated_at: item.updated_at || ''
+          };
           
-          if (item.periode) {
-            // If periode exists, convert to month name if it's a number
-            const periodeNum = parseInt(item.periode);
-            if (!isNaN(periodeNum) && periodeNum >= 1 && periodeNum <= 12) {
-              monthName = monthNames[periodeNum - 1];
-            } else {
-              // If periode is already a month name, use it
-              monthName = item.periode;
-            }
-          } else if (item.created_at) {
-            // Extract month from created_at date
-            const date = new Date(item.created_at);
-            monthName = monthNames[date.getMonth()];
-          } else {
-            monthName = 'Tidak Diketahui';
-          }
-          
-          if (!facilityMap.has(idUser)) {
-            facilityMap.set(idUser, {
+          if (!facilityReportsMap.has(idUser)) {
+            facilityReportsMap.set(idUser, {
               id_user: idUser,
               nama_fasilitas: facilityName,
               tipe_tempat: facilityType,
               alamat_tempat: alamat,
               kelurahan: kelurahan,
               kecamatan: kecamatan,
-              volume_total: 0,
-              jumlah_laporan: 0,
-              jumlah_laporan_lab: 0,
-              nama_transporter: transporterName,
-              tanggal_terakhir: item.created_at || item.updated_at || new Date().toISOString(),
               reports: [],
-              lab_reports: []
+              total_reports: 0
             });
           }
           
-          const facility = facilityMap.get(idUser);
-          facility.volume_total += volume;
-          facility.jumlah_laporan += 1;
-          facility.reports.push({
-            ...item,
-            volume: volume,
-            monthName: monthName
-          });
-          
-          // Update latest date
-          const currentDate = new Date(item.created_at || item.updated_at || new Date());
-          const latestDate = new Date(facility.tanggal_terakhir);
-          if (currentDate > latestDate) {
-            facility.tanggal_terakhir = item.created_at || item.updated_at;
-          }
+          const facilityReports = facilityReportsMap.get(idUser)!;
+          facilityReports.reports.push(labReport);
+          facilityReports.total_reports += 1;
         });
       }
       
-      // Process lab report data
-      if (Array.isArray(labData)) {
-        labData.forEach((item: any) => {
-          const idUser = item.id_user || item.user?.id_user;
-          const facilityName = item.user?.nama_tempat || item.user?.nama_user || item.nama_fasilitas || 'Fasilitas Tidak Diketahui';
-          const facilityType = item.user?.tipe_tempat || 'Tidak Diketahui';
-          const alamat = item.user?.alamat_tempat || '';
-          const kelurahan = item.user?.kelurahan || '';
-          const kecamatan = item.user?.kecamatan || '';
-          
-          if (!facilityMap.has(idUser)) {
-            facilityMap.set(idUser, {
-              id_user: idUser,
-              nama_fasilitas: facilityName,
-              tipe_tempat: facilityType,
-              alamat_tempat: alamat,
-              kelurahan: kelurahan,
-              kecamatan: kecamatan,
-              volume_total: 0,
-              jumlah_laporan: 0,
-              jumlah_laporan_lab: 0,
-              nama_transporter: '-',
-              tanggal_terakhir: item.created_at || item.updated_at || new Date().toISOString(),
-              reports: [],
-              lab_reports: []
-            });
-          }
-          
-          const facility = facilityMap.get(idUser);
-          facility.jumlah_laporan_lab += 1;
-          facility.lab_reports.push(item);
-          
-          // Update latest date if lab report is more recent
-          const currentDate = new Date(item.created_at || item.updated_at || new Date());
-          const latestDate = new Date(facility.tanggal_terakhir);
-          if (currentDate > latestDate) {
-            facility.tanggal_terakhir = item.created_at || item.updated_at;
-          }
-        });
-      }
+      // Convert to summary data for table display
+      const processedData: RekapitulasiData[] = [];
       
-      // Convert facility map to array and calculate status
-      facilityMap.forEach((facility, idUser) => {
-        // Calculate status based on data completeness and timeliness
-        let status: 'Lengkap' | 'Tidak Lengkap' | 'Terlambat' = 'Lengkap';
-        let persentase_kepatuhan = 100;
+      facilityReportsMap.forEach((facilityReports, idUser) => {
+        // Calculate basic statistics
+        const totalReports = facilityReports.total_reports;
+        const expectedReports = selectedPeriod === 'all' ? 12 : 1;
+        const completionPercentage = Math.round((totalReports / expectedReports) * 100);
         
-        // Check if facility has reports for the selected period
-        if (facility.jumlah_laporan === 0) {
+        let status: 'Lengkap' | 'Tidak Lengkap' | 'Terlambat' = 'Lengkap';
+        if (totalReports === 0) {
           status = 'Tidak Lengkap';
-          persentase_kepatuhan = 0;
-        } else {
-          // Calculate expected reports based on period
-          let expectedReports = 1;
-          if (selectedPeriod === 'all') {
-            expectedReports = 12; // All months
-          }
-          
-          if (facility.jumlah_laporan < expectedReports) {
-            status = 'Tidak Lengkap';
-            persentase_kepatuhan = Math.round((facility.jumlah_laporan / expectedReports) * 100);
-          }
+        } else if (totalReports < expectedReports) {
+          status = 'Tidak Lengkap';
         }
         
+        // Get latest report date
+        const latestReport = facilityReports.reports.reduce((latest, current) => {
+          return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
+        }, facilityReports.reports[0]);
+        
         processedData.push({
-          key: facility.id_user.toString(),
-          id_user: facility.id_user,
-          nama_fasilitas: facility.nama_fasilitas,
-          tipe_tempat: facility.tipe_tempat,
-          alamat_tempat: facility.alamat_tempat,
-          kelurahan: facility.kelurahan,
-          kecamatan: facility.kecamatan,
-          volume_total: facility.volume_total,
-          jumlah_laporan: facility.jumlah_laporan,
-          jumlah_laporan_lab: facility.jumlah_laporan_lab || 0,
+          key: facilityReports.id_user.toString(),
+          id_user: facilityReports.id_user,
+          nama_fasilitas: facilityReports.nama_fasilitas,
+          tipe_tempat: facilityReports.tipe_tempat,
+          alamat_tempat: facilityReports.alamat_tempat,
+          kelurahan: facilityReports.kelurahan,
+          kecamatan: facilityReports.kecamatan,
+          jumlah_laporan: totalReports,
           periode: selectedPeriod === 'all' ? 'Semua Bulan' : selectedPeriod,
           status: status,
-          persentase_kepatuhan: persentase_kepatuhan,
-          nama_transporter: facility.nama_transporter || '-',
-          tanggal_terakhir: facility.tanggal_terakhir
+          persentase_kepatuhan: Math.min(completionPercentage, 100),
+          jenis_pemeriksaan: ['Kualitas Udara', 'Kualitas Air', 'Kualitas Makanan', 'Usap Alat Medis', 'Limbah Cair'],
+          tanggal_terakhir: latestReport?.created_at || '-'
         });
       });
       
       // Add facilities that haven't reported at all
-      console.log('Processing facilities that haven\'t reported...');
-      console.log('facilityMap keys:', Array.from(facilityMap.keys()));
-      
       allFacilities.forEach((facility: any) => {
-        console.log('Checking facility:', facility.id_user, facility.nama_fasilitas || facility.nama_tempat || facility.nama_user);
-        if (!facilityMap.has(facility.id_user)) {
-          console.log('Adding facility without reports:', facility.nama_fasilitas || facility.nama_tempat || facility.nama_user);
+        if (!facilityReportsMap.has(facility.id_user)) {
           processedData.push({
             key: facility.id_user.toString(),
             id_user: facility.id_user,
@@ -446,31 +298,23 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
             alamat_tempat: facility.alamat || facility.alamat_tempat || '-',
             kelurahan: facility.kelurahan || '-',
             kecamatan: facility.kecamatan || '-',
-            volume_total: 0,
             jumlah_laporan: 0,
-            jumlah_laporan_lab: 0,
             periode: selectedPeriod === 'all' ? 'Semua Bulan' : selectedPeriod,
             status: 'Tidak Lengkap' as const,
             persentase_kepatuhan: 0,
-            nama_transporter: '-',
+            jenis_pemeriksaan: [],
             tanggal_terakhir: '-'
           });
-        } else {
-          console.log('Facility already has reports:', facility.nama_fasilitas || facility.nama_tempat || facility.nama_user);
         }
       });
       
-      console.log('Processed limbah cair data:', processedData);
-      console.log('Total processed facilities:', processedData.length);
-      
+      console.log('Processed laporan lab data:', processedData);
       setData(processedData);
       
-      // Calculate yearly data for yearly view - pass facility data with reports
-      const facilityDataWithReports = Array.from(facilityMap.values());
-      
-      // Add facilities without reports to yearly data as well
+      // Calculate simplified yearly data
+      const facilityDataWithReports = Array.from(facilityReportsMap.values());
       allFacilities.forEach((facility: any) => {
-        if (!facilityMap.has(facility.id_user)) {
+        if (!facilityReportsMap.has(facility.id_user)) {
           facilityDataWithReports.push({
             id_user: facility.id_user,
             nama_fasilitas: facility.nama_user || facility.nama_tempat || facility.nama_fasilitas || 'Tidak Diketahui',
@@ -478,27 +322,21 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
             alamat_tempat: facility.alamat_tempat || facility.alamat || '-',
             kelurahan: facility.kelurahan || '-',
             kecamatan: facility.kecamatan || '-',
-            volume_total: 0,
-            jumlah_laporan: 0,
-            nama_transporter: '-',
-            tanggal_terakhir: '-',
-            reports: []
+            reports: [],
+            total_reports: 0
           });
         }
       });
       
-      console.log('Facility data with reports for yearly calculation:', facilityDataWithReports.length);
       const calculatedYearlyData = calculateYearlyData(facilityDataWithReports);
-      console.log('Calculated yearly data:', calculatedYearlyData.length);
       setYearlyData(calculatedYearlyData);
       
       message.success(`Data berhasil dimuat: ${processedData.length} fasilitas kesehatan`);
       
     } catch (error: any) {
-      console.error('Error fetching limbah cair data:', error);
+      console.error('Error fetching laporan lab data:', error);
       
-      // Enhanced error handling
-      let errorMessage = 'Terjadi kesalahan saat memuat data limbah cair';
+      let errorMessage = 'Terjadi kesalahan saat memuat data laporan lab';
       
       if (error.response) {
         const status = error.response.status;
@@ -522,8 +360,6 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
       }
       
       message.error(errorMessage);
-      
-      // Set empty data on error instead of using dummy data
       setData([]);
       setYearlyData([]);
     } finally {
@@ -547,15 +383,13 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
 
   // Export handler
   const handleExport = () => {
-     // 1. Ambil data yang sudah difilter yang sesuai dengan tampilan di tabel
+    // 1. Ambil data yang sudah difilter yang sedang ditampilkan di tabel
     const dataToExport = filteredYearlyData;
 
     if (dataToExport.length === 0) {
       message.warning('Tidak ada data untuk diekspor.');
       return;
     }
-
-    message.loading('Mempersiapkan file unduhan...', 0.5);
 
     // 2. Tentukan header untuk file CSV (judul kolom)
     const headers = [
@@ -565,16 +399,14 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
       "Alamat",
       "Kelurahan",
       "Kecamatan",
-      "Total Volume Tahunan (L)",
       "Total Laporan Tahunan",
-      "Rata-rata Bulanan (L)",
       "Persentase Kelengkapan (%)",
       "Status Tahunan"
     ];
 
     // 3. Ubah setiap objek data menjadi baris CSV
     const csvRows = dataToExport.map(row => {
-      // Pastikan urutannya sama persis dengan header
+      // Pastikan urutannya sama dengan header
       const rowData = [
         row.id_user,
         `"${row.nama_fasilitas.replace(/"/g, '""')}"`, // Bungkus dengan kutip untuk menangani koma
@@ -582,9 +414,7 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
         `"${row.alamat_tempat.replace(/"/g, '""')}"`,
         `"${row.kelurahan}"`,
         `"${row.kecamatan}"`,
-        row.total_volume_tahunan,
         row.total_laporan_tahunan,
-        row.rata_rata_bulanan,
         row.persentase_kelengkapan,
         `"${row.status_tahunan}"`
       ];
@@ -594,15 +424,14 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
     // 4. Gabungkan header dan semua baris data, dipisahkan oleh baris baru
     const csvString = [headers.join(','), ...csvRows].join('\n');
 
-    // 5. Buat Blob dari string CSV (file virtual di memori)
-    // \uFEFF ditambahkan untuk memastikan kompatibilitas dengan Excel
-    const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
+    // 5. Buat Blob dari string CSV
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
 
     // 6. Buat link sementara untuk memicu unduhan
     const link = document.createElement("a");
     if (link.download !== undefined) {
       const url = URL.createObjectURL(blob);
-      const fileName = `rekapitulasi_limbah_cair_${currentYear}.csv`;
+      const fileName = `rekapitulasi_laporan_lab_${currentYear}.csv`;
       
       link.setAttribute("href", url);
       link.setAttribute("download", fileName);
@@ -610,10 +439,8 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
-      setTimeout(() => {
-        message.success(`Berhasil mengunduh ${fileName}`);
-      }, 500);
+
+      message.success(`Berhasil mengunduh ${fileName}`);
     }
   };
 
@@ -644,36 +471,6 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
       )
     },
     {
-      title: 'Total Volume Tahunan (L)',
-      dataIndex: 'total_volume_tahunan',
-      key: 'total_volume_tahunan',
-      width: 150,
-      sorter: (a, b) => (a.total_volume_tahunan || 0) - (b.total_volume_tahunan || 0),
-      render: (value) => (
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#1890ff' }}>
-            {(value || 0).toLocaleString('id-ID', { minimumFractionDigits: 1 })}
-          </div>
-          <div style={{ fontSize: '11px', color: '#666' }}>L/tahun</div>
-        </div>
-      )
-    },
-    {
-      title: 'Rata-rata Bulanan (L)',
-      dataIndex: 'rata_rata_bulanan',
-      key: 'rata_rata_bulanan',
-      width: 140,
-      sorter: (a, b) => (a.rata_rata_bulanan || 0) - (b.rata_rata_bulanan || 0),
-      render: (value) => (
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
-            {(value || 0).toLocaleString('id-ID', { minimumFractionDigits: 1 })}
-          </div>
-          <div style={{ fontSize: '11px', color: '#666' }}>L/bulan</div>
-        </div>
-      )
-    },
-    {
       title: 'Laporan Masuk',
       dataIndex: 'total_laporan_tahunan',
       key: 'total_laporan_tahunan',
@@ -689,7 +486,7 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
       )
     },
     {
-      title: 'Ketepatan Waktu (%)',
+      title: 'Kelengkapan (%)',
       dataIndex: 'persentase_kelengkapan',
       key: 'persentase_kelengkapan',
       width: 120,
@@ -729,105 +526,6 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
         return <Tag color={colors[status]}>{status}</Tag>;
       }
     },
-    {
-      title: 'Bulan Tertinggi',
-      key: 'bulan_tertinggi',
-      width: 140,
-      render: (_, record) => (
-        <div>
-          <div style={{ fontWeight: 'bold', fontSize: '12px' }}>
-            {record.bulan_tertinggi?.bulan || '-'}
-          </div>
-          <div style={{ fontSize: '11px', color: '#666' }}>
-            {(record.bulan_tertinggi?.volume || 0).toLocaleString('id-ID', { minimumFractionDigits: 1 })} L
-          </div>
-        </div>
-      )
-    },
-    // {
-    //   title: 'Jumlah Laporan',
-    //   dataIndex: 'jumlah_laporan',
-    //   key: 'jumlah_laporan',
-    //   width: 120,
-    //   sorter: (a, b) => (a.jumlah_laporan || 0) - (b.jumlah_laporan || 0),
-    //   render: (value) => (
-    //     <div style={{ textAlign: 'center' }}>
-    //       <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#1890ff' }}>
-    //         {value || 0}
-    //       </div>
-    //       <div style={{ fontSize: '11px', color: '#666' }}>limbah cair</div>
-    //     </div>
-    //   )
-    // },
-    // {
-    //   title: 'Laporan Lab',
-    //   dataIndex: 'jumlah_laporan_lab',
-    //   key: 'jumlah_laporan_lab',
-    //   width: 120,
-    //   sorter: (a, b) => (a.jumlah_laporan_lab || 0) - (b.jumlah_laporan_lab || 0),
-    //   render: (value) => (
-    //     <div style={{ textAlign: 'center' }}>
-    //       <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#52c41a' }}>
-    //         {value || 0}
-    //       </div>
-    //       <div style={{ fontSize: '11px', color: '#666' }}>laporan lab</div>
-    //     </div>
-    //   )
-    // },
-    // {
-    //   title: 'Kepatuhan (%)',
-    //   dataIndex: 'persentase_kepatuhan',
-    //   key: 'persentase_kepatuhan',
-    //   width: 120,
-    //   sorter: (a, b) => (a.persentase_kepatuhan || 0) - (b.persentase_kepatuhan || 0),
-    //   render: (value) => (
-    //     <div style={{ textAlign: 'center' }}>
-    //       <div style={{ fontWeight: 'bold', fontSize: '16px', color: (value || 0) >= 80 ? '#52c41a' : (value || 0) >= 60 ? '#faad14' : '#ff4d4f' }}>
-    //         {value || 0}%
-    //       </div>
-    //       <div style={{ fontSize: '11px', color: '#666' }}>
-    //         {value >= 80 ? 'Baik' : value >= 60 ? 'Cukup' : 'Kurang'}
-    //       </div>
-    //     </div>
-    //   )
-    // },
-    // {
-    //   title: 'Status',
-    //   dataIndex: 'status',
-    //   key: 'status',
-    //   width: 120,
-    //   filters: [
-    //     { text: 'Lengkap', value: 'Lengkap' },
-    //     { text: 'Tidak Lengkap', value: 'Tidak Lengkap' },
-    //     { text: 'Terlambat', value: 'Terlambat' }
-    //   ],
-    //   onFilter: (value, record) => record.status === value,
-    //   render: (status: 'Lengkap' | 'Tidak Lengkap' | 'Terlambat') => {
-    //     const colors = {
-    //       'Lengkap': 'green',
-    //       'Tidak Lengkap': 'orange',
-    //       'Terlambat': 'red'
-    //     };
-    //     return <Tag color={colors[status]}>{status}</Tag>;
-    //   }
-    // },
-    // {
-    //   title: 'Tanggal Terakhir',
-    //   dataIndex: 'tanggal_terakhir',
-    //   key: 'tanggal_terakhir',
-    //   width: 130,
-    //   sorter: (a, b) => dayjs(a.tanggal_terakhir).unix() - dayjs(b.tanggal_terakhir).unix(),
-    //   render: (date) => (
-    //     <div>
-    //       <div style={{ fontWeight: 'bold' }}>
-    //         {dayjs(date).format('DD/MM/YYYY')}
-    //       </div>
-    //       <div style={{ fontSize: '12px', color: '#666' }}>
-    //         <CalendarOutlined /> {dayjs(date).fromNow()}
-    //       </div>
-    //     </div>
-    //   )
-    // },
     {
       title: 'Aksi',
       key: 'action',
@@ -871,26 +569,14 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
           <div style={{ fontSize: '12px', color: '#666' }}>
             <EnvironmentOutlined /> {record.tipe_tempat}
           </div>
-        </div>
-      )
-    },
-    {
-      title: 'Volume Total (L)',
-      dataIndex: 'volume_total',
-      key: 'volume_total',
-      width: 130,
-      sorter: (a, b) => (a.volume_total || 0) - (b.volume_total || 0),
-      render: (value) => (
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
-            {(value || 0).toLocaleString('id-ID', { minimumFractionDigits: 1 })}
+          <div style={{ fontSize: '11px', color: '#999' }}>
+            {record.kelurahan}, {record.kecamatan}
           </div>
-          <div style={{ fontSize: '11px', color: '#666' }}>L</div>
         </div>
       )
     },
     {
-      title: 'Limbah Cair',
+      title: 'Jumlah Laporan Lab',
       dataIndex: 'jumlah_laporan',
       key: 'jumlah_laporan',
       width: 120,
@@ -900,23 +586,41 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
           <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#1890ff' }}>
             {value || 0}
           </div>
-          <div style={{ fontSize: '11px', color: '#666' }}>limbah cair</div>
+          <div style={{ fontSize: '11px', color: '#666' }}>laporan lab</div>
         </div>
       )
     },
     {
-      title: 'Kepatuhan (%)',
+      title: 'Periode',
+      dataIndex: 'periode',
+      key: 'periode',
+      width: 120,
+      render: (value) => (
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+            {value}
+          </div>
+          <div style={{ fontSize: '11px', color: '#666' }}>
+            Tahun {currentYear}
+          </div>
+        </div>
+      )
+    },
+    {
+      title: 'Kelengkapan (%)',
       dataIndex: 'persentase_kepatuhan',
       key: 'persentase_kepatuhan',
       width: 120,
       sorter: (a, b) => (a.persentase_kepatuhan || 0) - (b.persentase_kepatuhan || 0),
       render: (value) => (
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontWeight: 'bold', fontSize: '16px', color: (value || 0) >= 80 ? '#52c41a' : (value || 0) >= 60 ? '#faad14' : '#ff4d4f' }}>
+          <Progress 
+            percent={value || 0} 
+            size="small" 
+            status={(value || 0) >= 75 ? 'success' : (value || 0) >= 50 ? 'active' : 'exception'}
+          />
+          <div style={{ fontSize: '12px', marginTop: '4px' }}>
             {value || 0}%
-          </div>
-          <div style={{ fontSize: '11px', color: '#666' }}>
-            {value >= 80 ? 'Baik' : value >= 60 ? 'Cukup' : 'Kurang'}
           </div>
         </div>
       )
@@ -938,7 +642,16 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
           'Tidak Lengkap': 'orange',
           'Terlambat': 'red'
         };
-        return <Tag color={colors[status]}>{status}</Tag>;
+        const icons = {
+          'Lengkap': <CheckCircleOutlined />,
+          'Tidak Lengkap': <ExclamationCircleOutlined />,
+          'Terlambat': <CloseCircleOutlined />
+        };
+        return (
+          <Tag color={colors[status]} icon={icons[status]}>
+            {status}
+          </Tag>
+        );
       }
     },
     {
@@ -946,17 +659,32 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
       dataIndex: 'tanggal_terakhir',
       key: 'tanggal_terakhir',
       width: 130,
-      sorter: (a, b) => dayjs(a.tanggal_terakhir).unix() - dayjs(b.tanggal_terakhir).unix(),
-      render: (date) => (
-        <div>
-          <div style={{ fontWeight: 'bold' }}>
-            {dayjs(date).format('DD/MM/YYYY')}
+      sorter: (a, b) => {
+        if (a.tanggal_terakhir === '-' && b.tanggal_terakhir === '-') return 0;
+        if (a.tanggal_terakhir === '-') return 1;
+        if (b.tanggal_terakhir === '-') return -1;
+        return dayjs(a.tanggal_terakhir).unix() - dayjs(b.tanggal_terakhir).unix();
+      },
+      render: (date) => {
+        if (date === '-') {
+          return (
+            <div style={{ textAlign: 'center', color: '#999' }}>
+              <div>-</div>
+              <div style={{ fontSize: '11px' }}>Belum ada laporan</div>
+            </div>
+          );
+        }
+        return (
+          <div>
+            <div style={{ fontWeight: 'bold' }}>
+              {dayjs(date).format('DD/MM/YYYY')}
+            </div>
+            <div style={{ fontSize: '12px', color: '#666' }}>
+              <CalendarOutlined /> {dayjs(date).fromNow()}
+            </div>
           </div>
-          <div style={{ fontSize: '12px', color: '#666' }}>
-            <CalendarOutlined /> {dayjs(date).fromNow()}
-          </div>
-        </div>
-      )
+        );
+      }
     },
     {
       title: 'Aksi',
@@ -965,7 +693,7 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
       fixed: 'right',
       render: (_, record) => (
         <Space>
-          <Tooltip title="Lihat Detail">
+          <Tooltip title="Lihat Detail Laporan Lab">
             <Button 
               type="primary" 
               icon={<EyeOutlined />} 
@@ -973,7 +701,7 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
               onClick={() => handleViewDetail(record)}
             />
           </Tooltip>
-          <Tooltip title="Unduh Laporan">
+          <Tooltip title="Unduh Laporan Lab">
             <Button 
               icon={<DownloadOutlined />} 
               size="small"
@@ -987,10 +715,10 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
 
   const handleViewDetail = (record: RekapitulasiData) => {
   console.log('View detail for:', record);
-  
-  // PERUBAHAN: Menggunakan objek untuk router.push agar lebih aman dan jelas
+
+  // PERUBAHAN: Menggunakan objek untuk router.push agar lebih aman
   router.push({
-    pathname: '/dashboard/admin/manajemen/laporan-rekapitulasi/limbah-cair/detail',
+    pathname: '/dashboard/admin/manajemen/laporan-rekapitulasi/laporan-lab/detail',
     query: { 
       id: record.id_user, // ID sekarang menjadi query parameter
       tahun: currentYear 
@@ -1000,15 +728,15 @@ const calculateYearlyData = (facilityData: any[]): YearlyFacilityData[] => {
 
 const handleDownload = (record: RekapitulasiData) => {
     console.log('Download report for:', record);
-    // Implement download logic
+    message.info('Fitur download laporan sedang dalam pengembangan');
 };
 
 const handleViewYearlyDetail = (record: YearlyFacilityData) => {
   console.log('View yearly detail for:', record);
 
-  // PERUBAHAN: Menggunakan objek untuk router.push agar lebih aman dan jelas
+  // PERUBAHAN: Menggunakan objek untuk router.push agar lebih aman
   router.push({
-    pathname: '/dashboard/admin/manajemen/laporan-rekapitulasi/limbah-cair/detail',
+    pathname: '/dashboard/admin/manajemen/laporan-rekapitulasi/laporan-lab/detail',
     query: { 
       id: record.id_user, // ID sekarang menjadi query parameter
       tahun: currentYear 
@@ -1018,7 +746,7 @@ const handleViewYearlyDetail = (record: YearlyFacilityData) => {
 
   // const handleDownloadYearly = (record: YearlyFacilityData) => {
   //   console.log('Download yearly report for:', record);
-  //   // Implement yearly download logic
+  //   message.info('Fitur download laporan tahunan sedang dalam pengembangan');
   // };
 
   // Calculate summary statistics
@@ -1043,23 +771,14 @@ const handleViewYearlyDetail = (record: YearlyFacilityData) => {
     return matchesSearch && matchesStatus;
   });
 
-  const totalFasilitas = viewMode === 'monthly' ? filteredData.length : filteredYearlyData.length;
-  const totalBeratLimbah = viewMode === 'monthly' 
-    ? filteredData.reduce((sum, item) => sum + item.volume_total, 0)
-    : filteredYearlyData.reduce((sum, item) => sum + item.total_volume_tahunan, 0);
-  const totalLaporan = viewMode === 'monthly'
-    ? filteredData.reduce((sum, item) => sum + item.jumlah_laporan, 0)
-    : filteredYearlyData.reduce((sum, item) => sum + item.total_laporan_tahunan, 0);
-  const rataRataKepatuhan = viewMode === 'monthly'
-    ? (filteredData.length > 0 
-        ? filteredData.reduce((sum, item) => sum + item.persentase_kepatuhan, 0) / filteredData.length 
-        : 0)
-    : (filteredYearlyData.length > 0 
-        ? filteredYearlyData.reduce((sum, item) => sum + item.persentase_kelengkapan, 0) / filteredYearlyData.length 
-        : 0);
+  const totalFasilitas = filteredData.length;
+  const totalLaporan = filteredData.reduce((sum, item) => sum + item.jumlah_laporan, 0);
+  const rataRataKepatuhan = filteredData.length > 0 
+    ? filteredData.reduce((sum, item) => sum + item.persentase_kepatuhan, 0) / filteredData.length 
+    : 0;
 
   return (
-    <MainLayout title="Manajemen Laporan Rekapitulasi - Limbah Cair">
+    <MainLayout title="Manajemen Laporan Rekapitulasi - Laporan Lab">
       {/* Header Section with Year Navigation */}
       <div style={{
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -1080,7 +799,7 @@ const handleViewYearlyDetail = (record: YearlyFacilityData) => {
             fontWeight: 'bold',
             color: 'white'
           }}>
-            💧 Rekapitulasi Laporan Limbah Cair {currentYear}
+            🧪 Rekapitulasi Laporan Lab {currentYear}
           </h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {/* Year Navigation */}
@@ -1139,26 +858,26 @@ const handleViewYearlyDetail = (record: YearlyFacilityData) => {
         </div>
 
         {/* Summary Statistics */}
-        <Row gutter={[16, 16]} justify="center" style={{ marginBottom: '24px' }}>
+        <Row gutter={[16, 16]} justify="center" style={{ marginBottom: '20px' }}>
           <Col xs={24} sm={12} md={6} lg={6}>
             <div style={{
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               borderRadius: '16px',
-              padding: '20px',
+              padding: '18px',
               color: 'white',
               textAlign: 'center',
               boxShadow: '0 8px 24px rgba(102, 126, 234, 0.25)',
               transition: 'transform 0.3s ease, box-shadow 0.3s ease',
               cursor: 'pointer',
-              height: '130px',
+              height: '120px',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center'
             }}>
-              <div style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '6px', lineHeight: '1' }}>
+              <div style={{ fontSize: '26px', fontWeight: 'bold', marginBottom: '6px', lineHeight: '1' }}>
                 {totalFasilitas}
               </div>
-              <div style={{ fontSize: '13px', opacity: 0.9, fontWeight: '500' }}>
+              <div style={{ fontSize: '12px', opacity: 0.9, fontWeight: '500' }}>
                 Total Fasilitas Tahunan
               </div>
             </div>
@@ -1168,46 +887,22 @@ const handleViewYearlyDetail = (record: YearlyFacilityData) => {
             <div style={{
               background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
               borderRadius: '16px',
-              padding: '20px',
+              padding: '18px',
               color: 'white',
               textAlign: 'center',
               boxShadow: '0 8px 24px rgba(240, 147, 251, 0.25)',
               transition: 'transform 0.3s ease, box-shadow 0.3s ease',
               cursor: 'pointer',
-              height: '130px',
+              height: '120px',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center'
             }}>
-              <div style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '6px', lineHeight: '1' }}>
+              <div style={{ fontSize: '26px', fontWeight: 'bold', marginBottom: '6px', lineHeight: '1' }}>
                 {totalLaporan}
               </div>
-              <div style={{ fontSize: '13px', opacity: 0.9, fontWeight: '500' }}>
+              <div style={{ fontSize: '12px', opacity: 0.9, fontWeight: '500' }}>
                 Total Laporan Tahunan
-              </div>
-            </div>
-          </Col>
-          
-          <Col xs={24} sm={12} md={6} lg={6}>
-            <div style={{
-              background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-              borderRadius: '16px',
-              padding: '20px',
-              color: 'white',
-              textAlign: 'center',
-              boxShadow: '0 8px 24px rgba(79, 172, 254, 0.25)',
-              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-              cursor: 'pointer',
-              height: '130px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center'
-            }}>
-              <div style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '6px', lineHeight: '1' }}>
-                {totalBeratLimbah.toFixed(2)} L
-              </div>
-              <div style={{ fontSize: '13px', opacity: 0.9, fontWeight: '500' }}>
-                Total Volume Limbah Tahunan
               </div>
             </div>
           </Col>
@@ -1216,48 +911,48 @@ const handleViewYearlyDetail = (record: YearlyFacilityData) => {
             <div style={{
               background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
               borderRadius: '16px',
-              padding: '20px',
+              padding: '18px',
               color: 'white',
               textAlign: 'center',
               boxShadow: '0 8px 24px rgba(250, 112, 154, 0.25)',
               transition: 'transform 0.3s ease, box-shadow 0.3s ease',
               cursor: 'pointer',
-              height: '130px',
+              height: '120px',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center'
             }}>
-              <div style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '6px', lineHeight: '1' }}>
+              <div style={{ fontSize: '26px', fontWeight: 'bold', marginBottom: '6px', lineHeight: '1' }}>
                 {rataRataKepatuhan.toFixed(1)}%
               </div>
-              <div style={{ fontSize: '13px', opacity: 0.9, fontWeight: '500' }}>
-                Rata-rata Ketepatan Waktu
+              <div style={{ fontSize: '12px', opacity: 0.9, fontWeight: '500' }}>
+                Rata-rata Ketepatan Tahunan
               </div>
             </div>
           </Col>
         </Row>
 
         {/* Additional Yearly Statistics */}
-        <Row gutter={[16, 16]} justify="center" style={{ marginBottom: '24px' }}>
+        <Row gutter={[16, 16]} justify="center" style={{ marginBottom: '20px' }}>
           <Col xs={24} sm={12} md={6} lg={6}>
             <div style={{
               background: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
               borderRadius: '16px',
-              padding: '20px',
+              padding: '18px',
               color: '#2c3e50',
               textAlign: 'center',
               boxShadow: '0 8px 24px rgba(168, 237, 234, 0.3)',
               transition: 'transform 0.3s ease, box-shadow 0.3s ease',
               cursor: 'pointer',
-              height: '130px',
+              height: '120px',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center'
             }}>
-              <div style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '6px', lineHeight: '1' }}>
+              <div style={{ fontSize: '26px', fontWeight: 'bold', marginBottom: '6px', lineHeight: '1' }}>
                 {data.filter(item => item.persentase_kepatuhan >= 90).length}
               </div>
-              <div style={{ fontSize: '13px', opacity: 0.8, fontWeight: '500' }}>
+              <div style={{ fontSize: '12px', opacity: 0.8, fontWeight: '500' }}>
                 Fasilitas Lengkap
               </div>
             </div>
@@ -1267,46 +962,22 @@ const handleViewYearlyDetail = (record: YearlyFacilityData) => {
             <div style={{
               background: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
               borderRadius: '16px',
-              padding: '20px',
+              padding: '18px',
               color: '#2c3e50',
               textAlign: 'center',
               boxShadow: '0 8px 24px rgba(255, 236, 210, 0.3)',
               transition: 'transform 0.3s ease, box-shadow 0.3s ease',
               cursor: 'pointer',
-              height: '130px',
+              height: '120px',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center'
             }}>
-              <div style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '6px', lineHeight: '1' }}>
+              <div style={{ fontSize: '26px', fontWeight: 'bold', marginBottom: '6px', lineHeight: '1' }}>
                 {data.filter(item => item.persentase_kepatuhan < 90 && item.persentase_kepatuhan >= 50).length}
               </div>
-              <div style={{ fontSize: '13px', opacity: 0.8, fontWeight: '500' }}>
+              <div style={{ fontSize: '12px', opacity: 0.8, fontWeight: '500' }}>
                 Fasilitas Tidak Lengkap
-              </div>
-            </div>
-          </Col>
-          
-          <Col xs={24} sm={12} md={6} lg={6}>
-            <div style={{
-              background: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
-              borderRadius: '16px',
-              padding: '20px',
-              color: '#2c3e50',
-              textAlign: 'center',
-              boxShadow: '0 8px 24px rgba(255, 154, 158, 0.3)',
-              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-              cursor: 'pointer',
-              height: '130px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center'
-            }}>
-              <div style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '6px', lineHeight: '1' }}>
-                {data.filter(item => item.persentase_kepatuhan < 50).length}
-              </div>
-              <div style={{ fontSize: '13px', opacity: 0.8, fontWeight: '500' }}>
-                Fasilitas Belum Lapor
               </div>
             </div>
           </Col>
@@ -1315,22 +986,22 @@ const handleViewYearlyDetail = (record: YearlyFacilityData) => {
             <div style={{
               background: 'linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%)',
               borderRadius: '16px',
-              padding: '20px',
+              padding: '18px',
               color: '#2c3e50',
               textAlign: 'center',
               boxShadow: '0 8px 24px rgba(161, 196, 253, 0.3)',
               transition: 'transform 0.3s ease, box-shadow 0.3s ease',
               cursor: 'pointer',
-              height: '130px',
+              height: '120px',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center'
             }}>
-              <div style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '6px', lineHeight: '1' }}>
-                {data.length > 0 ? (data.reduce((sum, item) => sum + item.volume_total, 0) / data.length).toFixed(1) : '0.0'} L
+              <div style={{ fontSize: '26px', fontWeight: 'bold', marginBottom: '6px', lineHeight: '1' }}>
+                {data.filter(item => item.persentase_kepatuhan < 50).length}
               </div>
-              <div style={{ fontSize: '13px', opacity: 0.8, fontWeight: '500' }}>
-                Rata-rata Volume/Bulan
+              <div style={{ fontSize: '12px', opacity: 0.8, fontWeight: '500' }}>
+                Fasilitas Belum Lapor
               </div>
             </div>
           </Col>
@@ -1409,8 +1080,8 @@ const handleViewYearlyDetail = (record: YearlyFacilityData) => {
           pagination={{
             total: yearlyData.length,
             pageSize: 10,
-            pageSizeOptions: ['10', '15', '20', '50', '100'],
             showSizeChanger: true,
+            pageSizeOptions: ['10', '15', '20', '50', '100'],
             showQuickJumper: true,
             showTotal: (total, range) => `${range[0]}-${range[1]} dari ${total} fasilitas`,
           }}
@@ -1441,4 +1112,38 @@ const handleViewYearlyDetail = (record: YearlyFacilityData) => {
   );
 };
 
-export default LaporanRekapitulasiLimbahCair;
+export default LaporanRekapitulasiLaporanLab;
+
+
+interface LaporanLabData {
+  key: string;
+  id_laporan_lab: number;
+  id_user: number;
+  nama_fasilitas: string;
+  tipe_tempat: string;
+  alamat_tempat: string;
+  kelurahan: string;
+  kecamatan: string;
+  kualitas_udara: string | null;
+  kualitas_air: string | null;
+  kualitas_makanan: string | null;
+  usap_alat_medis: string | null;
+  limbah_cair: string | null;
+  catatan: string | null;
+  periode: number;
+  periode_nama: string;
+  tahun: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface FacilityLabReports {
+  id_user: number;
+  nama_fasilitas: string;
+  tipe_tempat: string;
+  alamat_tempat: string;
+  kelurahan: string;
+  kecamatan: string;
+  reports: LaporanLabData[];
+  total_reports: number;
+}

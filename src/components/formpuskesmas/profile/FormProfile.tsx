@@ -71,7 +71,6 @@ const FormProfile = () => {
     link_swa_pantau: "",
     link_lab_limbah_cair: "",
     link_izin_ipal: "",
-    link_izin_tps: "",
     link_ukl: "",
     link_upl: "",
     link1: "",
@@ -80,7 +79,6 @@ const FormProfile = () => {
     kapasitas_ipal: "",
     kapasitas_ipal_option: "ada", // "ada" or "tidak_ada"
     link_input_izin_ipal: "",
-    link_input_izin_tps: "",
     link_input_dokumen_lingkungan_rs: "",
     link_manifest: "",
     link_logbook: "",
@@ -185,7 +183,7 @@ const FormProfile = () => {
     dataForm.append("id_kecamatan", form.id_kecamatan);
     dataForm.append("id_kelurahan", form.id_kelurahan);
     dataForm.append("alamat_tempat", form.alamat);
-    dataForm.append("nohp", form.telp);
+    dataForm.append("notlp", form.telp);
     dataForm.append("email", form.email);
     dataForm.append(
       "link_dokumen_lingkungan_rs",
@@ -194,7 +192,6 @@ const FormProfile = () => {
     dataForm.append("link_swa_pantau", form.link_swa_pantau);
     dataForm.append("link_lab_limbah_cair", form.link_lab_limbah_cair);
     dataForm.append("link_izin_ipal", form.link_izin_ipal);
-    dataForm.append("link_izin_tps", form.link_izin_tps);
     dataForm.append("link_ukl", form.link_ukl);
     dataForm.append("link_upl", form.link_upl);
     dataForm.append("link1", form.link1);
@@ -203,7 +200,6 @@ const FormProfile = () => {
     dataForm.append("kapasitas_ipal", form.kapasitas_ipal);
     dataForm.append("kapasitas_ipal_option", form.kapasitas_ipal_option);
     dataForm.append("link_input_izin_ipal", form.link_input_izin_ipal);
-    dataForm.append("link_input_izin_tps", form.link_input_izin_tps);
     dataForm.append(
       "link_input_dokumen_lingkungan_rs",
       form.link_input_dokumen_lingkungan_rs
@@ -264,13 +260,12 @@ const FormProfile = () => {
       id_kecamatan: user?.id_kecamatan?.toString() ?? "",
       id_kelurahan: user?.id_kelurahan?.toString() ?? "",
       alamat: user?.alamat_tempat ?? "",
-      telp: user?.nohp ?? "",
+      telp: user?.notlp ?? "",
       email: user?.email ?? "",
       link_dokumen_lingkungan_rs: user?.link_dokumen_lingkungan_rs ?? "",
       link_swa_pantau: user?.link_swa_pantau ?? "",
       link_lab_limbah_cair: user?.link_lab_limbah_cair ?? "",
       link_izin_ipal: user?.link_izin_ipal ?? "",
-      link_izin_tps: user?.link_izin_tps ?? "",
       link_ukl: user?.link_ukl ?? "",
       link_upl: user?.link_upl ?? "",
       link1: user?.link1 ?? "",
@@ -279,7 +274,6 @@ const FormProfile = () => {
       kapasitas_ipal: user?.kapasitas_ipal ?? "",
       kapasitas_ipal_option: user?.kapasitas_ipal_option ?? (user?.kapasitas_ipal === "Tidak ada pemeriksaan" ? "tidak_ada" : "ada"),
       link_input_izin_ipal: user?.link_input_izin_ipal ?? "",
-      link_input_izin_tps: user?.link_input_izin_tps ?? "",
       link_input_dokumen_lingkungan_rs:
         user?.link_input_dokumen_lingkungan_rs ?? "",
       link_manifest: user?.link_manifest ?? "",
@@ -298,12 +292,11 @@ const FormProfile = () => {
       form_kecamatan: user?.id_kecamatan?.toString() ?? "",
       form_kelurahan: user?.id_kelurahan?.toString() ?? "",
       form_alamat: user?.alamat_tempat ?? "",
-      form_notelp: user?.nohp ?? "",
+      form_notelp: user?.notlp ?? "",
       form_email: user?.email ?? "",
       form_kapasitasIpal: user?.kapasitas_ipal ?? "",
       form_kapasitasIpal_option: user?.kapasitas_ipal_option ?? (user?.kapasitas_ipal === "Tidak ada pemeriksaan" ? "tidak_ada" : "ada"),
       form_inputLinkIzinIpal: user?.link_input_izin_ipal ?? "",
-      form_inputLinkIzinTps: user?.link_input_izin_tps ?? "",
       form_link_input_dokumen_lingkungan_rs:
         user?.link_input_dokumen_lingkungan_rs ?? "",
       form_link_manifest: user?.link_manifest ?? "",
@@ -578,24 +571,6 @@ const FormProfile = () => {
               value={form.link_lab_lain}
               name="link_lab_lain"
               placeholder="Masukkan link lab lain"
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="form_link_izin_tps"
-            label="Link Izin TPS"
-            rules={[
-              {
-                required: true,
-                message: "Link izin TPS wajib diisi.",
-              },
-            ]}>
-            <Input
-              style={inputStyles}
-              onChange={handleChangeInput}
-              value={form.link_izin_tps}
-              name="link_izin_tps"
-              placeholder="Masukkan link izin TPS"
             />
           </Form.Item>
 

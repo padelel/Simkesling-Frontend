@@ -29,9 +29,10 @@ app.prepare().then(() => {
       res.statusCode = 500
       res.end('internal server error')
     }
-  }).listen(port, (err) => {
-    if (err) throw err
-    console.log(`> Ready on http://${hostname}:${port}`)
-  })
+  }).listen((err) => { // HAPUS port DAN hostname DARI SINI
+  if (err) throw err
+  // Pesan log ini tidak akan relevan lagi di server, tapi tidak apa-apa
+  console.log(`> Server listening...`) 
+    })
 })
 

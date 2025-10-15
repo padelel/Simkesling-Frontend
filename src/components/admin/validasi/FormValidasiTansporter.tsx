@@ -761,7 +761,7 @@ const FormValidasiTransporter: React.FC = () => {
                 let dateAkhirItem = dateRangeList[index][1];
                 let linkMou = linkMouList[index];
                 return (
-                  <>
+                  <React.Fragment key={`validasi-mou-${index}`}>
                     {dateAwalItem.format("DD MMMM YYYY").toString()}
                     {" - "}
                     {dateAkhirItem.format("DD MMMM YYYY").toString()}
@@ -778,7 +778,7 @@ const FormValidasiTransporter: React.FC = () => {
                       <LinkOutlined /> Klik Disini!
                     </a> */}
                     <hr />
-                  </>
+                  </React.Fragment>
                 );
               })}
             </td>

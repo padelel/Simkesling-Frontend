@@ -59,6 +59,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, title }) => {
           path: "/dashboard/user/limbah-cair/dashboard",
           level: "user",
         },
+        {
+          label: "Dashboard Pemeriksaan Lab",
+          path: "/dashboard/user/lab-lainnya/dashboard",
+          level: "user",
+        },
       ],
     },
     {
@@ -118,6 +123,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, title }) => {
           path: "/dashboard/admin/limbah-cair",
           level: "admin",
         },
+        {
+          label: "Laporan Lab",
+          path: "/dashboard/admin/laporan-lab",
+          level: "admin",
+        },
       ],
     },
     {
@@ -175,6 +185,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, title }) => {
         {
           label: "Limbah Cair",
           path: "/dashboard/admin/manajemen/laporan-rekapitulasi/limbah-cair",
+          level: "admin",
+        },
+        {
+          label: "Laporan Lab",
+          path: "/dashboard/admin/manajemen/laporan-rekapitulasi/laporan-lab",
           level: "admin",
         },
       ],
@@ -280,9 +295,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, title }) => {
           <br />
         </div>
         <h4 style={{ textAlign: "center" }}>
-          Sistem Informasi Manajemen Kesehatan Lingkungan
+          D'Smiling
           <br />
-          Kota Depok
+          Depok Sistem Manajemen Kesehatan Lingkungan
         </h4>
         <div>
           {/* <h5 style={{ textAlign: "center" }}>

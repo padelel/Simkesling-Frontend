@@ -81,10 +81,6 @@ interface DataType {
   [key: string]: any;
 }
 
-const onChange = (pagination: any, filters: any, sorter: any, extra: any) => {
-  console.log("params", pagination, filters, sorter, extra);
-};
-
 const ManajemenLaporanLimbahCairPage: React.FC = () => {
   const router = useRouter();
   const globalStore = useGlobalStore();
@@ -98,6 +94,14 @@ const ManajemenLaporanLimbahCairPage: React.FC = () => {
   const [form, setForm] = useState<any>({
     nama_user: "",
   });
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(15);
+
+  const onChange = (pagination: any, filters: any, sorter: any, extra: any) => {
+    console.log("params", pagination, filters, sorter, extra);
+    setCurrentPage(pagination.current);
+    setPageSize(pagination.pageSize);
+  };
 
   const handleExpand = (expanded: boolean, record: DataType) => {
     const keys = [...expandedRowKeys];
@@ -139,6 +143,7 @@ const ManajemenLaporanLimbahCairPage: React.FC = () => {
     if (currentYear > Math.min(...availableYears)) {
       setCurrentYear(currentYear - 1);
       setExpandedRowKeys([]); // Reset expanded rows when changing year
+      setCurrentPage(1); // Reset pagination when changing year
     }
   };
 
@@ -146,6 +151,7 @@ const ManajemenLaporanLimbahCairPage: React.FC = () => {
     if (currentYear < Math.max(...availableYears)) {
       setCurrentYear(currentYear + 1);
       setExpandedRowKeys([]); // Reset expanded rows when changing year
+      setCurrentPage(1); // Reset pagination when changing year
     }
   };
 
@@ -170,44 +176,34 @@ const ManajemenLaporanLimbahCairPage: React.FC = () => {
     return expandedData;
   };
 
-  const getReportedMonths = (facilityData: any[]): number[] => {
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-    const fullMonthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+const getReportedMonths = (facilityData: any[]): number[] => {
     const reportedMonths = new Set<number>();
-    
+    const fullMonthNames = ['januari', 'februari', 'maret', 'april', 'mei', 'juni', 'juli', 'agustus', 'september', 'oktober', 'november', 'desember'];
+
     facilityData.forEach(item => {
-      if (item.periode) {
-        if (typeof item.periode === 'number') {
-          reportedMonths.add(item.periode);
-        } else if (typeof item.periode === 'string') {
-          const periodeStr = item.periode.toLowerCase().trim();
-          
-          // Try to match with short month names (Jan, Feb, etc.)
-          let monthIndex = monthNames.findIndex(month => 
-            month.toLowerCase() === periodeStr.substring(0, 3)
-          );
-          
-          // If not found, try to match with full month names (Januari, Februari, etc.)
-          if (monthIndex === -1) {
-            monthIndex = fullMonthNames.findIndex(month => 
-              month.toLowerCase() === periodeStr
-            );
-          }
-          
-          // If still not found, try partial matching for full month names
-          if (monthIndex === -1) {
-            monthIndex = fullMonthNames.findIndex(month => 
-              periodeStr.includes(month.toLowerCase()) || month.toLowerCase().includes(periodeStr)
-            );
-          }
-          
-          if (monthIndex !== -1) {
-            reportedMonths.add(monthIndex + 1);
-          }
-        }
+      // Lewati jika periode null, undefined, atau placeholder
+      if (item.periode === null || item.periode === undefined || item.isPlaceholder) {
+        return;
+      }
+
+      // 1. Prioritaskan konversi ke angka
+      const periodeNum = parseInt(item.periode.toString(), 10);
+
+      // 2. Jika hasilnya adalah angka bulan yang valid, gunakan itu
+      if (!isNaN(periodeNum) && periodeNum >= 1 && periodeNum <= 12) {
+        reportedMonths.add(periodeNum);
+        return; // Lanjut ke item berikutnya
+      }
+
+      // 3. Jika gagal, baru coba parsing nama bulan (sebagai fallback)
+      const periodeStr = item.periode.toString().toLowerCase().trim();
+      const monthIndex = fullMonthNames.findIndex(month => month === periodeStr);
+
+      if (monthIndex !== -1) {
+        reportedMonths.add(monthIndex + 1);
       }
     });
-    
+
     return Array.from(reportedMonths).sort((a, b) => a - b);
   };
 
@@ -270,36 +266,15 @@ const ManajemenLaporanLimbahCairPage: React.FC = () => {
       onCell: (record) => {
         if (record.isYearGroup) {
           return {
-            colSpan: 7,
+            colSpan: 6,
             className: 'year-group-row'
           };
         }
         if (record.isGroup) {
           return {
-            colSpan: 7,
+            colSpan: 6,
             className: 'group-row'
           };
-        }
-        return {};
-      },
-    },
-    {
-      title: "Nama Transporter",
-      dataIndex: "namaTransporter",
-      key: "namaTransporter",
-      render: (text, record) => {
-        if (record.isGroup || record.isYearGroup) {
-          return null;
-        }
-        // Handle placeholder data
-        if (record.isPlaceholder || record.status === 'Belum Melapor') {
-          return <span style={{ color: '#999', fontStyle: 'italic' }}>Belum melapor</span>;
-        }
-        return text || '-';
-      },
-      onCell: (record) => {
-        if (record.isGroup || record.isYearGroup) {
-          return { colSpan: 0 };
         }
         return {};
       },
@@ -439,6 +414,7 @@ const ManajemenLaporanLimbahCairPage: React.FC = () => {
 
   const getData = async () => {
     if (globalStore.setLoading) globalStore.setLoading(true);
+    setCurrentPage(1); // Reset pagination when filtering data
     try {
       // Fetch all healthcare facilities first
       const allFacilitiesResponse = await api.post("/user/puskesmas-rumahsakit/data");
@@ -941,11 +917,24 @@ const ManajemenLaporanLimbahCairPage: React.FC = () => {
               rowExpandable: (record) => !!record.isGroup
             }}
             pagination={{
-              pageSize: 15,
+              current: currentPage,
+              pageSize: pageSize,
+              total: getCurrentYearData().length,
               showSizeChanger: true,
               showQuickJumper: true,
               showTotal: (total, range) =>
                 `${range[0]}-${range[1]} dari ${total} laporan`,
+              pageSizeOptions: ['10', '15', '20', '50', '100'],
+              onShowSizeChange: (current, size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              },
+              onChange: (page, size) => {
+                setCurrentPage(page);
+                if (size && size !== pageSize) {
+                  setPageSize(size);
+                }
+              },
             }}
             scroll={{ x: 1200 }}
             rowClassName={(record) => {

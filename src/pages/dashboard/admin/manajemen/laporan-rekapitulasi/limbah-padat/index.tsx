@@ -100,6 +100,8 @@ const LaporanRekapitulasiLimbahPadat: React.FC = () => {
   const [apiData, setApiData] = useState<MLaporanRekapitulasi | null>(null);
   const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('yearly');
   const [yearlyData, setYearlyData] = useState<YearlyFacilityData[]>([]);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
 
   // Fetch data from API
   const fetchData = async () => {
@@ -147,7 +149,7 @@ const LaporanRekapitulasiLimbahPadat: React.FC = () => {
             }
             processedUsers.add(userKey);
             
-            // Calculate status based on data completeness
+            // Calculate status based on time-based compliance
             let status: 'Lengkap' | 'Tidak Lengkap' | 'Terlambat' = 'Lengkap';
             let persentase_kepatuhan = 100;
             
@@ -169,14 +171,30 @@ const LaporanRekapitulasiLimbahPadat: React.FC = () => {
               
               if (persentase_kepatuhan < 100) {
                 status = 'Tidak Lengkap';
-              }
-              
-              // Check if report is late (simplified logic)
-              const currentDate = new Date();
-              const reportDate = new Date(limbahData.created_at);
-              const daysDiff = Math.floor((currentDate.getTime() - reportDate.getTime()) / (1000 * 3600 * 24));
-              if (daysDiff > 30) { // Consider late if more than 30 days old
-                status = 'Terlambat';
+              } else {
+                // Check if report is submitted on time based on period
+                const reportDate = new Date(limbahData.created_at);
+                const reportPeriod = laporan.periode || 1; // Default to January if no period
+                
+                // Calculate deadline: 5th of the following month
+                const deadlineYear = currentYear;
+                let deadlineMonth = reportPeriod + 1; // Next month after report period
+                let actualDeadlineYear = deadlineYear;
+                
+                // Handle December case (period 12 -> deadline in January next year)
+                if (deadlineMonth > 12) {
+                  deadlineMonth = 1;
+                  actualDeadlineYear = deadlineYear + 1;
+                }
+                
+                const deadline = new Date(actualDeadlineYear, deadlineMonth - 1, 5, 23, 59, 59); // 5th of next month, end of day
+                
+                // Check if submitted after deadline
+                if (reportDate > deadline) {
+                  status = 'Terlambat';
+                  // Reduce compliance percentage for late submission
+                  persentase_kepatuhan = Math.max(0, persentase_kepatuhan - 20);
+                }
               }
             }
             
@@ -235,6 +253,7 @@ const LaporanRekapitulasiLimbahPadat: React.FC = () => {
               limbah_b3_nonmedis: limbahData ? parseFloat(limbahData.limbah_b3_nonmedis?.toString() || '0') || 0 : ((user as any).limbah_b3_nonmedis || 0),
               limbah_jarum: limbahData ? parseFloat(limbahData.limbah_jarum?.toString() || '0') || 0 : ((user as any).limbah_jarum || 0),
               limbah_sludge_ipal: limbahData ? parseFloat(limbahData.limbah_sludge_ipal?.toString() || '0') || 0 : ((user as any).limbah_sludge_ipal || 0),
+              debit_limbah_cair: limbahData ? parseFloat(limbahData.debit_limbah_cair?.toString() || '0') || 0 : ((user as any).debit_limbah_cair || 0),
             });
           });
         });
@@ -343,6 +362,24 @@ const LaporanRekapitulasiLimbahPadat: React.FC = () => {
               const limbahJarum = parseFloat(limbahData.limbah_jarum?.toString() || '0') || 0;
               const limbahSludge = parseFloat(limbahData.limbah_sludge_ipal?.toString() || '0') || 0;
               
+              // Check if this report was submitted on time
+              const reportDate = new Date(limbahData.created_at);
+              const reportPeriod = laporan.periode || 1;
+              
+              // Calculate deadline: 5th of the following month
+              const deadlineYear = currentYear;
+              let deadlineMonth = reportPeriod + 1;
+              let actualDeadlineYear = deadlineYear;
+              
+              // Handle December case
+              if (deadlineMonth > 12) {
+                deadlineMonth = 1;
+                actualDeadlineYear = deadlineYear + 1;
+              }
+              
+              const deadline = new Date(actualDeadlineYear, deadlineMonth - 1, 5, 23, 59, 59);
+              const isOnTime = reportDate <= deadline;
+              
               // Add to yearly totals
               facility.total_berat_tahunan += beratBulan;
               facility.total_laporan_tahunan += 1;
@@ -351,11 +388,11 @@ const LaporanRekapitulasiLimbahPadat: React.FC = () => {
               facility.limbah_jarum_tahunan += limbahJarum;
               facility.limbah_sludge_ipal_tahunan += limbahSludge;
               
-              // Track monthly details
+              // Track monthly details with time compliance
               facility.detail_bulanan.push({
                 periode: laporan.periode_nama || `Periode ${laporan.periode}`,
                 berat: beratBulan,
-                status: beratBulan > 0 ? 'Ada Laporan' : 'Tidak Ada Laporan',
+                status: isOnTime ? 'Tepat Waktu' : 'Terlambat',
                 tanggal: new Date(limbahData.created_at).toLocaleDateString('id-ID')
               });
               
@@ -386,10 +423,13 @@ const LaporanRekapitulasiLimbahPadat: React.FC = () => {
         ? facility.total_berat_tahunan / facility.total_laporan_tahunan 
         : 0;
       
-      // Calculate completeness percentage (assuming 12 months in a year)
-      facility.persentase_kelengkapan = Math.round((facility.total_laporan_tahunan / 12) * 100);
+      // Calculate time-based compliance percentage
+      const onTimeReports = facility.detail_bulanan.filter(detail => detail.status === 'Tepat Waktu').length;
+      facility.persentase_kelengkapan = facility.detail_bulanan.length > 0 
+        ? Math.round((onTimeReports / facility.detail_bulanan.length) * 100)
+        : 0;
       
-      // Determine yearly status
+      // Determine yearly status based on time compliance
       if (facility.persentase_kelengkapan >= 90) {
         facility.status_tahunan = 'Sangat Baik';
       } else if (facility.persentase_kelengkapan >= 75) {
@@ -459,7 +499,7 @@ const LaporanRekapitulasiLimbahPadat: React.FC = () => {
       )
     },
     {
-      title: 'Kepatuhan (%)',
+      title: 'Ketepatan Waktu (%)',
       dataIndex: 'persentase_kepatuhan',
       key: 'persentase_kepatuhan',
       width: 120,
@@ -605,7 +645,7 @@ const LaporanRekapitulasiLimbahPadat: React.FC = () => {
       )
     },
     {
-      title: 'Kelengkapan (%)',
+      title: 'Ketepatan Waktu (%)',
       dataIndex: 'persentase_kelengkapan',
       key: 'persentase_kelengkapan',
       width: 120,
@@ -675,13 +715,13 @@ const LaporanRekapitulasiLimbahPadat: React.FC = () => {
               onClick={() => handleViewYearlyDetail(record)}
             />
           </Tooltip>
-          <Tooltip title="Unduh Laporan Tahunan">
+          {/* <Tooltip title="Unduh Laporan Tahunan">
             <Button 
               icon={<DownloadOutlined />} 
               size="small"
               onClick={() => handleDownloadYearly(record)}
             />
-          </Tooltip>
+          </Tooltip> */}
         </Space>
       )
     }
@@ -690,8 +730,14 @@ const LaporanRekapitulasiLimbahPadat: React.FC = () => {
   // Add error handling and loading states
   const handleViewDetail = (record: RekapitulasiData) => {
     console.log('View detail for:', record);
-    // Navigate to detail page with facility ID and year
-    router.push(`/dashboard/admin/manajemen/laporan-rekapitulasi/limbah-padat/detail/${record.id_user}?tahun=${currentYear}`);
+    // PERUBAHAN: Menggunakan objek untuk router.push agar lebih aman dan jelas
+    router.push({
+      pathname: '/dashboard/admin/manajemen/laporan-rekapitulasi/limbah-padat/detail',
+      query: { 
+        id: record.id_user, // ID sekarang menjadi query parameter
+        tahun: currentYear 
+      }
+    });
   };
 
   const handleDownload = (record: RekapitulasiData) => {
@@ -701,18 +747,97 @@ const LaporanRekapitulasiLimbahPadat: React.FC = () => {
 
   const handleViewYearlyDetail = (record: YearlyFacilityData) => {
     console.log('View yearly detail for:', record);
-    // Navigate to detail page with facility ID and year
-    router.push(`/dashboard/admin/manajemen/laporan-rekapitulasi/limbah-padat/detail/${record.id_user}?tahun=${currentYear}`);
+    // PERUBAHAN: Menggunakan objek untuk router.push agar lebih aman dan jelas
+    router.push({
+      pathname: '/dashboard/admin/manajemen/laporan-rekapitulasi/limbah-padat/detail',
+      query: { 
+        id: record.id_user, // ID sekarang menjadi query parameter
+        tahun: currentYear 
+      }
+    });
   };
 
-  const handleDownloadYearly = (record: YearlyFacilityData) => {
-    console.log('Download yearly report for:', record);
-    // Implement yearly download logic
-  };
+  // const handleDownloadYearly = (record: YearlyFacilityData) => {
+  //   console.log('Download yearly report for:', record);
+  //   // Implement yearly download logic
+  // };
 
   const handleExport = () => {
-    console.log('Export all data');
-    // Implement export logic
+    // 1. Ambil data yang sudah difilter sesuai dengan apa yang ditampilkan di tabel
+    const dataToExport = filteredYearlyData;
+
+    if (dataToExport.length === 0) {
+      message.warning('Tidak ada data untuk diekspor.');
+      return;
+    }
+
+    message.loading('Mempersiapkan file unduhan...', 0.5);
+
+    // 2. Tentukan header untuk file CSV (judul kolom)
+    const headers = [
+      "ID User",
+      "Nama Fasilitas",
+      "Tipe Tempat",
+      "Alamat",
+      "Kelurahan",
+      "Kecamatan",
+      "Total Berat Tahunan (kg)",
+      "Total Laporan Tahunan",
+      "Rata-rata Bulanan (kg)",
+      "Ketepatan Waktu (%)",
+      "Status Tahunan",
+      "Limbah B3 Medis (kg)",
+      "Limbah B3 Non-Medis (kg)",
+      "Limbah Jarum (kg)",
+      "Limbah Sludge IPAL (kg)"
+    ];
+
+    // 3. Ubah setiap objek data menjadi baris CSV
+    const csvRows = dataToExport.map(row => {
+      // Pastikan urutannya sama persis dengan header
+      const rowData = [
+        row.id_user,
+        `"${row.nama_fasilitas.replace(/"/g, '""')}"`, // Bungkus dengan kutip untuk menangani koma
+        `"${row.tipe_tempat}"`,
+        `"${row.alamat_tempat.replace(/"/g, '""')}"`,
+        `"${row.kelurahan}"`,
+        `"${row.kecamatan}"`,
+        row.total_berat_tahunan,
+        row.total_laporan_tahunan,
+        row.rata_rata_bulanan,
+        row.persentase_kelengkapan,
+        `"${row.status_tahunan}"`,
+        row.limbah_b3_medis_tahunan,
+        row.limbah_b3_nonmedis_tahunan,
+        row.limbah_jarum_tahunan,
+        row.limbah_sludge_ipal_tahunan
+      ];
+      return rowData.join(','); // Gabungkan dengan koma
+    });
+
+    // 4. Gabungkan header dan semua baris data, dipisahkan oleh baris baru
+    const csvString = [headers.join(','), ...csvRows].join('\n');
+
+    // 5. Buat Blob dari string CSV (file virtual di memori)
+    const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' }); // \uFEFF untuk support Excel
+
+    // 6. Buat link sementara untuk memicu unduhan
+    const link = document.createElement("a");
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      const fileName = `rekapitulasi_limbah_B3_${currentYear}.csv`;
+      
+      link.setAttribute("href", url);
+      link.setAttribute("download", fileName);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setTimeout(() => {
+        message.success(`Berhasil mengunduh ${fileName}`);
+      }, 500);
+    }
   };
 
   const handleRefresh = () => {
@@ -765,7 +890,7 @@ const LaporanRekapitulasiLimbahPadat: React.FC = () => {
         : 0);
 
   return (
-    <MainLayout title="Manajemen Laporan Rekapitulasi - Limbah Padat">
+    <MainLayout title="Manajemen Laporan Rekapitulasi - Limbah B3">
       {/* Header Section with Year Navigation */}
       <div style={{
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -786,7 +911,7 @@ const LaporanRekapitulasiLimbahPadat: React.FC = () => {
             fontWeight: 'bold',
             color: 'white'
           }}>
-            📊 Rekapitulasi Laporan Limbah Padat {currentYear}
+            📊 Rekapitulasi Laporan Limbah B3 {currentYear}
           </h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {/* Year Navigation */}
@@ -913,7 +1038,7 @@ const LaporanRekapitulasiLimbahPadat: React.FC = () => {
                 {rataRataKepatuhan.toFixed(1)}%
               </div>
               <div style={{ fontSize: '14px', opacity: 0.9 }}>
-                Rata-rata Kepatuhan Tahunan
+                Rata-rata Ketepatan Waktu
               </div>
             </div>
           </Col>
@@ -1027,7 +1152,7 @@ const LaporanRekapitulasiLimbahPadat: React.FC = () => {
               </Button>
               <Button 
                 icon={<DownloadOutlined />}
-                onClick={() => message.info('Fitur download laporan tahunan sedang dalam pengembangan')}
+                onClick={handleExport}
               >
                 Download Laporan Tahunan
               </Button>
@@ -1066,10 +1191,23 @@ const LaporanRekapitulasiLimbahPadat: React.FC = () => {
           scroll={{ x: 1200 }}
           pagination={{
             total: yearlyData.length,
-            pageSize: 10,
+            current: currentPage,
+            pageSize: pageSize,
             showSizeChanger: true,
+            pageSizeOptions: ['10', '15', '20', '50', '100'],
             showQuickJumper: true,
             showTotal: (total, range) => `${range[0]}-${range[1]} dari ${total} fasilitas`,
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              if (size !== pageSize) {
+                setPageSize(size);
+                setCurrentPage(1); // Reset to first page when page size changes
+              }
+            },
+            onShowSizeChange: (current, size) => {
+              setPageSize(size);
+              setCurrentPage(1); // Reset to first page when page size changes
+            },
           }}
           rowKey="id_user"
           rowClassName={(record, index) => 

@@ -25,6 +25,18 @@ const DashboardAdminLimbahCairPage: React.FC = () => {
   const [chartWidth, setChartWidth] = useState(800);
   const [chartHeight, setChartHeight] = useState(400);
   const [judulChart, setJudulChart] = useState("");
+  const currentBulan = new Date().getMonth() + 1;
+
+  const monthNames = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
+function getMonthName(month: number) {
+  return monthNames[month];
+}
+
+
 
   const tmpSeriesLimbahCair = [
     {
@@ -95,7 +107,7 @@ const DashboardAdminLimbahCairPage: React.FC = () => {
       colors: ['transparent']
     },
     title: {
-      text: `Grafik Status Pelaporan Limbah Cair Puskesmas & RS ${judulChart}`,
+      text: `Grafik Status Pelaporan Limbah Cair Puskesmas & RS ${getMonthName(currentBulan)} ${judulChart}`,
       align: "center" as const,
     },
   };
@@ -119,15 +131,45 @@ const DashboardAdminLimbahCairPage: React.FC = () => {
   };
 
   const hitDashboard = async () => {
+    console.log('=== LIMBAH CAIR DASHBOARD START ===');
+    console.log('Form data before API call:', form);
+    
     if (globalStore.setLoading) globalStore.setLoading(true);
     try {
       let dataForm: any = new FormData();
       dataForm.append("tahun", form.tahun);
       let url = "/user/dashboard-admin/limbah-cair/data";
+      
+      console.log('API URL:', url);
+      console.log('Form data being sent:', { tahun: form.tahun });
+      
       let responsenya = await api.post(url, dataForm);
       
       // Process response data here
-      console.log('Admin Limbah Cair Data:', responsenya.data);
+      console.log('=== RAW API RESPONSE ===');
+      console.log('Full API Response:', responsenya);
+      console.log('Response Data:', responsenya.data);
+      console.log('Response Values:', responsenya.data?.data?.values);
+      
+      // Log specific data fields
+      console.log('=== CHART DATA ===');
+      console.log('Sudah Lapor Data:', responsenya.data.data.values.total_chart_puskesmas_rs_sudah_lapor_limbah_cair || 
+        responsenya.data.data.values.total_chart_puskesmas_rs_sudah_lapor);
+      console.log('Belum Lapor Data:', responsenya.data.data.values.total_chart_puskesmas_rs_belum_lapor_limbah_cair || 
+        responsenya.data.data.values.total_chart_puskesmas_rs_belum_lapor);
+      
+      console.log('=== SUMMARY STATISTICS ===');
+      console.log('Total Puskesmas RS:', responsenya.data.data.values.total_puskesmas_rs);
+      console.log('Total Sudah Lapor:', responsenya.data.data.values.total_puskesmas_rs_sudah_lapor_limbah_cair || 
+        responsenya.data.data.values.total_puskesmas_rs_sudah_lapor);
+      console.log('Total Belum Lapor:', responsenya.data.data.values.total_puskesmas_rs_belum_lapor_limbah_cair || 
+        responsenya.data.data.values.total_puskesmas_rs_belum_lapor);
+      console.log('Total Transporter:', responsenya.data.data.values.total_transporter);
+      
+      console.log('=== NOTIFICATION DATA ===');
+      const notificationData = responsenya.data.data.values.notif_user_laporan_bulanan || [];
+      console.log('Notification Data Length:', notificationData.length);
+      console.log('First 3 Notification Items:', notificationData.slice(0, 3));
       
       let tmpDataLimbahCair = cloneDeep(tmpSeriesLimbahCair);
       
@@ -139,6 +181,10 @@ const DashboardAdminLimbahCairPage: React.FC = () => {
       const belumLaporData = responsenya.data.data.values.total_chart_puskesmas_rs_belum_lapor_limbah_cair || 
         responsenya.data.data.values.total_chart_puskesmas_rs_belum_lapor || Array(12).fill(0);
       
+      console.log('=== PROCESSED CHART DATA ===');
+      console.log('Processed Sudah Lapor Data:', sudahLaporData);
+      console.log('Processed Belum Lapor Data:', belumLaporData);
+      
       tmpDataLimbahCair[0].data = sudahLaporData;
       tmpDataLimbahCair[1].data = belumLaporData;
       
@@ -146,10 +192,11 @@ const DashboardAdminLimbahCairPage: React.FC = () => {
       
       // Set chart title
       let tahun = responsenya.data.data.values.laporan_periode_tahun;
+      console.log('Chart Title Year:', tahun);
       setJudulChart(tahun || form.tahun || new Date().getFullYear().toString());
       
       // Update form with statistics data
-      setForm({
+      const updatedForm = {
         ...form,
         tahun: form.tahun,
         total_puskesmas_rs: responsenya.data.data.values.total_puskesmas_rs || 0,
@@ -158,27 +205,49 @@ const DashboardAdminLimbahCairPage: React.FC = () => {
         total_puskesmas_rs_belum_lapor_limbah_cair: responsenya.data.data.values.total_puskesmas_rs_belum_lapor_limbah_cair || 
           responsenya.data.data.values.total_puskesmas_rs_belum_lapor || 0,
         total_transporter: responsenya.data.data.values.total_transporter || 0,
-      });
+      };
       
-      // Process table data for facilities that haven't reported liquid waste
-      const notificationData = responsenya.data.data.values.notif_user_laporan_bulanan || [];
-      const belumLaporLimbahCair = notificationData.filter((item: any) => {
-        // Use missing_months_cair if available (from new lookup system)
-        if (item.missing_months_cair && Array.isArray(item.missing_months_cair)) {
-          return item.missing_months_cair.length > 0; // Has missing months
-        }
-        // Fallback to old logic
-        return (item.sudah_lapor_limbah_cair === false || item.sudah_lapor_limbah_cair === 0) ||
-               (item.sudah_lapor_cair === false || item.sudah_lapor_cair === 0) ||
-               (item.sudah_lapor === false || item.sudah_lapor === 0);
-      });
+      console.log('=== UPDATED FORM DATA ===');
+      console.log('Updated Form:', updatedForm);
+      setForm(updatedForm);
       
-      const transformedTableData = belumLaporLimbahCair.map((item: any, index: number) => {
-        // Get missing months info
+      // Process table data for ALL facilities (both reported and not reported)
+      
+      // Show ALL facilities instead of filtering only those that haven't reported
+      const transformedTableData = notificationData.map((item: any, index: number) => {
         const missingMonths = item.missing_months_cair || [];
         const reportedMonths = item.reported_months_cair || [];
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
         const missingMonthNames = missingMonths.map((month: number) => monthNames[month - 1]).join(', ');
+        const reportedMonthNames = reportedMonths.map((month: number) => monthNames[month - 1]).join(', ');
+        
+        // Determine status based on reporting completion
+        const isFullyReported = missingMonths.length === 0 && reportedMonths.length === 12;
+        const isPartiallyReported = reportedMonths.length > 0 && missingMonths.length > 0;
+        const isNotReported = reportedMonths.length === 0;
+        
+        let statusText = '';
+        let statusColor = '';
+        
+        if (isFullyReported) {
+          statusText = 'Sudah Lapor Lengkap';
+          statusColor = 'green';
+        } else if (isPartiallyReported) {
+          statusText = `Sebagian Lapor (${reportedMonths.length}/12)`;
+          statusColor = 'orange';
+        } else {
+          statusText = 'Belum Lapor';
+          statusColor = 'red';
+        }
+        
+        // Log first few items for debugging
+        if (index < 3) {
+          console.log(`=== TABLE ITEM ${index + 1} ===`);
+          console.log('Original Item:', item);
+          console.log('Missing Months:', missingMonths);
+          console.log('Reported Months:', reportedMonths);
+          console.log('Status:', statusText, statusColor);
+        }
         
         return {
           key: index + 1,
@@ -187,16 +256,44 @@ const DashboardAdminLimbahCairPage: React.FC = () => {
           jenisInstansi: item.tipe_tempat || '-',
           kecamatan: item.kecamatan || '-',
           kelurahan: item.kelurahan || '-',
-          statusLaporan: `Belum Lapor: ${missingMonthNames || 'Semua bulan'}`,
+          statusLaporan: statusText,
+          statusColor: statusColor,
           missingCount: missingMonths.length,
-          reportedCount: reportedMonths.length
+          reportedCount: reportedMonths.length,
+          missingMonthNames: missingMonthNames || '-',
+          reportedMonthNames: reportedMonthNames || '-',
+          isFullyReported,
+          isPartiallyReported,
+          isNotReported
         };
       });
       
+      console.log('=== TABLE DATA PROCESSING ===');
+      console.log('Total Transformed Table Data:', transformedTableData.length);
+      console.log('First 2 Transformed Items:', transformedTableData.slice(0, 2));
+      
       setTableData(transformedTableData);
       
+      // Calculate summary statistics
+      const fullyReported = transformedTableData.filter(item => item.isFullyReported).length;
+      const partiallyReported = transformedTableData.filter(item => item.isPartiallyReported).length;
+      const notReported = transformedTableData.filter(item => item.isNotReported).length;
+      
+      console.log('=== FINAL SUMMARY STATISTICS ===');
+      console.log('Limbah Cair Summary:', {
+        total: transformedTableData.length,
+        fullyReported,
+        partiallyReported,
+        notReported
+      });
+      
+      console.log('=== LIMBAH CAIR DASHBOARD END ===');
+      
     } catch (e) {
-      console.error(e);
+      console.error('=== LIMBAH CAIR API ERROR ===');
+      console.error('Error details:', e);
+      console.error('Error message:', e.message);
+      console.error('Error stack:', e.stack);
     } finally {
       if (globalStore.setLoading) globalStore.setLoading(false);
     }
@@ -241,6 +338,28 @@ const DashboardAdminLimbahCairPage: React.FC = () => {
       sorter: (a: any, b: any) => a.kelurahan.localeCompare(b.kelurahan),
     },
     {
+      title: 'Status Pelaporan',
+      key: 'statusLaporan',
+      width: 150,
+      align: 'center' as const,
+      render: (record: any) => (
+        <Tag color={record.statusColor}>
+          {record.statusLaporan}
+        </Tag>
+      ),
+      sorter: (a: any, b: any) => {
+        const statusOrder = { 'green': 3, 'orange': 2, 'red': 1 };
+        return (statusOrder[a.statusColor as keyof typeof statusOrder] || 0) - 
+               (statusOrder[b.statusColor as keyof typeof statusOrder] || 0);
+      },
+      filters: [
+        { text: 'Sudah Lapor Lengkap', value: 'green' },
+        { text: 'Sebagian Lapor', value: 'orange' },
+        { text: 'Belum Lapor', value: 'red' },
+      ],
+      onFilter: (value: any, record: any) => record.statusColor === value,
+    },
+    {
       title: 'Progress',
       key: 'progress',
       width: 120,
@@ -256,20 +375,23 @@ const DashboardAdminLimbahCairPage: React.FC = () => {
       sorter: (a: any, b: any) => (a.reportedCount || 0) - (b.reportedCount || 0),
     },
     {
-      title: 'Bulan Belum Lapor',
-      dataIndex: 'statusLaporan',
-      key: 'statusLaporan',
-      render: (status: string) => {
-        const missingMonths = status.replace('Belum Lapor: ', '');
-        return (
-          <div>
-            <Tag color="volcano">Belum Lapor</Tag>
-            <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-              {missingMonths}
+      title: 'Detail Bulan',
+      key: 'detailBulan',
+      width: 200,
+      render: (record: any) => (
+        <div>
+          {record.reportedMonthNames && record.reportedMonthNames !== '-' && (
+            <div style={{ marginBottom: '4px' }}>
+              <Tag color="green" style={{ fontSize: '10px' }}>Sudah: {record.reportedMonthNames}</Tag>
             </div>
-          </div>
-        );
-      },
+          )}
+          {record.missingMonthNames && record.missingMonthNames !== '-' && (
+            <div>
+              <Tag color="red" style={{ fontSize: '10px' }}>Belum: {record.missingMonthNames}</Tag>
+            </div>
+          )}
+        </div>
+      ),
     },
   ];
 
@@ -329,7 +451,7 @@ const DashboardAdminLimbahCairPage: React.FC = () => {
             <Card
               title="Total Puskesmas & RS"
               style={{
-                width: 200,
+                width: 350,
                 backgroundColor: "#e3f2fd",
                 textAlign: "center"
               }}>
@@ -339,9 +461,9 @@ const DashboardAdminLimbahCairPage: React.FC = () => {
             </Card>
 
             <Card
-              title="Sudah Lapor Limbah Cair"
+              title={`Sudah Lapor Limbah Cair ${getMonthName(currentBulan)}`}
               style={{
-                width: 200,
+                width: 350,
                 backgroundColor: "#e8f5e8",
                 textAlign: "center"
               }}>
@@ -351,9 +473,9 @@ const DashboardAdminLimbahCairPage: React.FC = () => {
             </Card>
 
             <Card
-              title="Belum Lapor Limbah Cair"
+              title={`Belum Lapor Limbah Cair ${getMonthName(currentBulan)}`}
               style={{
-                width: 200,
+                width: 350,
                 backgroundColor: "#ffebee",
                 textAlign: "center"
               }}>
@@ -362,7 +484,7 @@ const DashboardAdminLimbahCairPage: React.FC = () => {
               </h2>
             </Card>
 
-            <Card
+            {/* <Card
               title="Total Transporter"
               style={{
                 width: 200,
@@ -372,7 +494,7 @@ const DashboardAdminLimbahCairPage: React.FC = () => {
               <h2 style={{ margin: 0, color: "#f57c00" }}>
                 {form.total_transporter}
               </h2>
-            </Card>
+            </Card> */}
           </Space>
         </div>
 
@@ -413,14 +535,16 @@ const DashboardAdminLimbahCairPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Table for facilities that haven't reported liquid waste */}
+        {/* Table for all facilities with comprehensive reporting status */}
         <div style={{ marginTop: 40, padding: '0 20px' }}>
           <Card 
             title={
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Tag color="volcano">Belum Lapor</Tag>
-                <span>Daftar Puskesmas & RS yang Belum Melaporkan Limbah Cair</span>
-                <Tag color="blue">{tableData.length} Fasilitas</Tag>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <span>Daftar Semua Rumah Sakit/Puskesmas</span>
+                <Tag color="blue">{tableData.length} Total</Tag>
+                <Tag color="green">{tableData.filter(item => item.isFullyReported).length} Lengkap</Tag>
+                <Tag color="orange">{tableData.filter(item => item.isPartiallyReported).length} Sebagian</Tag>
+                <Tag color="red">{tableData.filter(item => item.isNotReported).length} Belum</Tag>
               </div>
             }
             style={styleCardGraph}
@@ -445,9 +569,9 @@ const DashboardAdminLimbahCairPage: React.FC = () => {
                 padding: '40px', 
                 color: '#666' 
               }}>
-                <Tag color="green">Semua Fasilitas Sudah Melaporkan</Tag>
+                <Tag color="green">Semua Fasilitas Sudah Melaporkan Lengkap</Tag>
                 <p style={{ marginTop: '10px', fontSize: '14px' }}>
-                  Tidak ada puskesmas atau rumah sakit yang belum melaporkan limbah cair
+                  Semua puskesmas dan rumah sakit telah melaporkan limbah cair secara lengkap
                 </p>
               </div>
             )}
