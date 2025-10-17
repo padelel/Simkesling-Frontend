@@ -19,8 +19,8 @@ const PageViewLab = () => {
 
   return (
     <MainLayout title="Detail Laporan Pemeriksaan Lab Lainnya">
-      <h2 style={{ textAlign: "center" }}>Detail Laporan Pemeriksaan Lab Lainnya</h2>
-      <div style={{ display: "flex", justifyContent: "center" }}>
+<h2 className="text-center">Detail Laporan Pemeriksaan Lab Lainnya</h2>
+<div className="flex-center">
         <FormViewLaporanLabUser />
       </div>
     </MainLayout>

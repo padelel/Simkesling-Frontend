@@ -246,8 +246,20 @@ const FormPengajuanLimbahCair: React.FC = () => {
         url = "/user/limbah-cair/update";
       }
 
-      let responsenya = await api.post(url, dataForm);
+            let responsenya = await api.post(url, dataForm);
+      // Tampilkan notifikasi sukses langsung
       Notif("success", "Success.!", "Berhasil Simpan Laporan Limbah Cair");
+      // Simpan flash notif untuk halaman daftar setelah redirect
+      try {
+        const flashPayload = {
+          type: "success",
+          title: "Success.!",
+          description: "Berhasil Simpan Laporan Limbah Cair",
+        };
+        sessionStorage.setItem("flash_notif", JSON.stringify(flashPayload));
+      } catch (err) {
+        console.warn("Gagal menyimpan flash_notif ke sessionStorage:", err);
+      }
       router.push("/dashboard/user/limbah-cair");
     } catch (e) {
       console.error(e);

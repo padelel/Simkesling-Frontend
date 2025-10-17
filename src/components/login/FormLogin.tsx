@@ -1,130 +1,100 @@
-import React, { useState } from "react";
-import {
-  Button,
-  Card,
-  Checkbox,
-  Form,
-  Input,
-  Row,
-  notification,
-  Space,
-} from "antd";
+import React from "react";
+import { Button, Form, Input } from "antd";
 import { LoginOutlined } from "@ant-design/icons";
-import Link from "next/link";
 import { useUserLoginStore } from "@/stores/userLoginStore";
-import cloneDeep from "clone-deep";
 import { useRouter } from "next/router";
 import { useGlobalStore } from "@/stores/globalStore";
-
-const onFinishFailed = (errorInfo: any) => {
-  console.log("Failed:", errorInfo);
-};
-
-const cardStyle = {
-  width: "500px",
-  height: "202px",
-  borderRadius: "16px",
-  marginRight: "24px",
-  boxShadow: "5px 8px 24px 5px rgba(208, 216, 243, 0.6)",
-};
+import { useNotification } from "@/utils/Notif";
+// Tidak perlu import axios atau useApiWithNotification jika sudah ditangani oleh store
 
 const FormLogin = () => {
-  const globalStore = useGlobalStore();
-  let tmpForm = {
-    username: "",
-    password: "",
-  };
-
-  const [form, setForm] = useState(cloneDeep(tmpForm));
-  const router = useRouter();
-
   const userLogin = useUserLoginStore();
-  const handleChangeInput = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    // console.log(event);
-    setForm({
-      ...form,
-      [event.target.name]: event.target.value,
-    });
-  };
+  const globalStore = useGlobalStore();
+  const router = useRouter();
+  const { showNotification, contextHolder } = useNotification();
 
   const onFinish = async (values: any) => {
-    console.log("Success:", values);
-
-    if (userLogin.prosesLogin) {
-      if (globalStore.setLoading) {
-        globalStore.setLoading(true);
-      }
-      let usernya = await userLogin.prosesLogin(
+    if (globalStore.setLoading) {
+      globalStore.setLoading(true);
+    }
+    
+    try {
+      // LANGSUNG JALANKAN PROSES LOGIN JWT
+      // Panggilan ke /sanctum/csrf-cookie telah dihapus karena tidak diperlukan.
+      const usernya = await userLogin.prosesLogin(
         values.form_username,
         values.form_password
       );
-      if (globalStore.setLoading) {
-        globalStore.setLoading(false);
-      }
-      if (usernya == null) return;
 
-      console.log(usernya);
-      // let token = Cookies.get("token") ?? "";
-      // let user = jwt_decode(token) ?? undefined;
-      userLogin.user = usernya;
-      let url = "/dashboard/user";
       if (usernya) {
+        // Jika berhasil, tampilkan notifikasi sukses
+        showNotification("success", "Success Login.!");
+
+        // Proses redirect setelah login berhasil
+        let url = "/dashboard/user";
         if (usernya.level == "1") {
           url = "/dashboard/admin";
         }
+        await router.push(url);
+      } else {
+        // Jika store mengembalikan null, tampilkan notifikasi gagal tanpa melempar error
+        showNotification("error", "Gagal Login.!", "Username atau password salah.");
       }
-      globalStore.setLoading(true);
-      await router.push(url);
-      globalStore.setLoading(false);
+
+    } catch (error: any) {
+      const msg = (error?.message || "Username atau password salah.").toString();
+      showNotification("error", "Gagal Login.!", msg);
+      console.error("Terjadi kesalahan saat login:", error);
+    } finally {
+      if (globalStore.setLoading) {
+        globalStore.setLoading(false);
+      }
     }
   };
+
+  const onFinishFailed = (errorInfo: any) => {
+    console.log("Failed:", errorInfo);
+  };
+
   return (
+    <>
+    {contextHolder}
     <Form
       name="basic"
       layout="vertical"
-      initialValues={{ remember: true }}
       onFinish={onFinish}
       onFinishFailed={onFinishFailed}
-      autoComplete="off">
+      autoComplete="off"
+    >
       <Form.Item
         label="Username"
         name="form_username"
-        rules={[{ required: true, message: "Please input your username!" }]}>
-        <Input
-          placeholder="Masukan Username"
-          name="username"
-          onChange={handleChangeInput}
-          value={form.username}
-        />
+        rules={[{ required: true, message: "Please input your username!" }]}
+      >
+        <Input placeholder="Masukan Username" />
       </Form.Item>
 
       <Form.Item
         label="Password"
         name="form_password"
-        rules={[{ required: true, message: "Please input your password!" }]}>
-        <Input.Password
-          placeholder="Masukan Password"
-          name="password"
-          onChange={handleChangeInput}
-          value={form.password}
-        />
+        rules={[{ required: true, message: "Please input your password!" }]}
+      >
+        <Input.Password placeholder="Masukan Password" />
       </Form.Item>
 
       <Form.Item>
-        {/* <Link href="/dashboard/user" passHref> */}
         <Button
           size="large"
           block
           icon={<LoginOutlined />}
           type="primary"
-          htmlType="submit">
+          htmlType="submit"
+        >
           Login
         </Button>
-        {/* </Link> */}
       </Form.Item>
     </Form>
+    </>
   );
 };
 

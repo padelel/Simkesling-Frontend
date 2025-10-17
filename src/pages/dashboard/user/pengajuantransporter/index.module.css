@@ -1,0 +1,33 @@
+/* CSP-safe styles for Pengajuan Transporter page */
+
+.btnEdit {
+  background-color: yellow;
+}
+
+.btnReload {
+  margin-left: 15px;
+  background-color: orange;
+}
+
+.addContainer {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.btnAddShadow {
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.tableWrapper {
+  overflow-x: auto;
+}
+
+.titleCenter {
+  text-align: center;
+}
+
+.centerContainer {
+  display: flex;
+  justify-content: center;
+}

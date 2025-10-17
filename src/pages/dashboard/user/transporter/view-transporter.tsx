@@ -7,8 +7,8 @@ import React from "react";
 const PageViewTransporter = () => {
   return (
     <MainLayout title={"View Transporter"}>
-      <h2 style={{ textAlign: "center" }}>{"View Transporter"}</h2>
-      <div style={{ display: "flex", justifyContent: "center" }}>
+<h2 className="text-center">{"View Transporter"}</h2>
+<div className="flex-center">
         <ViewTransporter />
       </div>
     </MainLayout>

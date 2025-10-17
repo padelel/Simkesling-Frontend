@@ -1,4 +1,49 @@
 /* styles/globals.css */
 body {
   font-family: "Roboto", sans-serif;
+  margin: 0;
+  padding: 0;
 }
+
+/* Utility classes to replace inline styles for CSP compliance */
+.text-center { text-align: center; }
+.flex-center { display: flex; justify-content: center; }
+.mb-20 { margin-bottom: 20px; }
+.ml-15 { margin-left: 15px; }
+.overflow-x-auto { overflow-x: auto; }
+.shadow-soft { box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1); }
+.btn-yellow { background-color: yellow; }
+.btn-orange { background-color: orange; }
+.mt-20 { margin-top: 20px; }
+.mt-30 { margin-top: 30px; }
+.mb-16 { margin-bottom: 16px; }
+.w-200 { width: 200px; }
+.h-400 { height: 400px; }
+.items-center { align-items: center; }
+.shadow-medium { box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2); }
+.flex-col-center { display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.info-box { padding: 16px; background-color: #f0f2f5; border-radius: 8px; max-width: 600px; margin-left: auto; margin-right: auto; }
+.info-text { margin: 0; font-size: 14px; color: #666; }
+/* Additional utilities for homepage & login */
+.d-flex { display: flex; }
+.justify-between { justify-content: space-between; }
+.flex-col { display: flex; flex-direction: column; }
+.text-white { color: #fff; }
+.text-center { text-align: center; }
+.mr-5 { margin-right: 5px; }
+.mr-10 { margin-right: 10px; }
+.fs-24 { font-size: 24px; }
+.w-full { width: 100%; }
+.bg-blue { background-color: #007BFF; }
+.border-t-light { border-top: 1px solid #e8e8e8; }
+
+/* Layout helpers for centered page */
+.container { max-width: 1200px; margin-left: auto; margin-right: auto; padding-left: 16px; padding-right: 16px; }
+.mx-auto { margin-left: auto; margin-right: auto; }
+.justify-center { justify-content: center; }
+.landing-center { display: flex; flex-direction: column; align-items: center; width: 100%; }
+/* Ensure Ant Design Footer respects blue background */
+.ant-layout-footer.bg-blue { background-color: #007BFF !important; }
+.ant-layout-footer.text-white { color: #fff; }
+/* Make Ant Design Space behave like block container with full width */
+.space-block { display: flex; flex-direction: column; align-items: stretch; width: 100%; }

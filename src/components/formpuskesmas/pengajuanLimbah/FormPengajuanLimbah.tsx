@@ -282,6 +282,24 @@ const FormPengajuanLimbah: React.FC = () => {
 
   const handleSubmitButton = async () => {
     console.log(form);
+    // Validate required fields before submit to avoid 400 Bad Request
+    try {
+      await formInstance.validateFields();
+    } catch (err) {
+      Notif("error", "Validasi Gagal", "Lengkapi semua field wajib sebelum menyimpan.");
+      return;
+    }
+
+    // Additional guard rails for critical fields
+    if (!form.id_transporter) {
+      Notif("error", "Transporter wajib", "Pilih transporter terlebih dahulu.");
+      return;
+    }
+    if (!form.link_input_manifest || !form.link_input_logbook || !form.link_input_lab_lain) {
+      Notif("error", "Link wajib", "Isi link Manifest, Logbook, dan Hasil Lab Lain.");
+      return;
+    }
+
     let dataForm: any = new FormData();
     dataForm.append("oldid", form.oldid);
     dataForm.append("id_transporter", form.id_transporter);
@@ -368,12 +386,31 @@ const FormPengajuanLimbah: React.FC = () => {
     try {
       if (globalStore.setLoading) globalStore.setLoading(true);
       let responsenya = await api.post(url, dataForm);
-      Notif("success", "Sukses", "Berhasil tambah laporan.!");
+      // Tampilkan notifikasi langsung
+      const serverMsg = (responsenya?.data?.message) ? responsenya.data.message : "Berhasil tambah laporan.!";
+      Notif("success", "Sukses", serverMsg);
+      // Simpan flash notif untuk ditampilkan di halaman daftar setelah redirect
+      try {
+        if (typeof window !== 'undefined') {
+          const flash = { type: "success", title: "Sukses", desc: serverMsg, duration: 5 };
+          sessionStorage.setItem("flashNotif", JSON.stringify(flash));
+        }
+      } catch {}
       console.log(limbahPadatList);
       console.log(responsenya);
       router.push("/dashboard/user/limbah-padat");
     } catch (e) {
       console.error(e);
+      const status = (e as any)?.response?.status;
+      const message = (e as any)?.response?.data?.message || "Gagal menyimpan laporan.";
+      const details = (e as any)?.response?.data?.data;
+      if (status === 400) {
+        // Show validation error details if available
+        const fields = details ? Object.keys(details).join(", ") : "Form tidak sesuai";
+        Notif("error", "Validasi Tidak Sesuai", `${message}${details ? ` (Field: ${fields})` : ''}`);
+      } else {
+        Notif("error", "Error", message);
+      }
     } finally {
       if (globalStore.setLoading) globalStore.setLoading(false);
     }

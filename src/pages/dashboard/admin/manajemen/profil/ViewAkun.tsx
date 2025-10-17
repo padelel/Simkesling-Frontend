@@ -5,8 +5,8 @@ import React from "react";
 const ViewAkun = () => {
   return (
     <MainLayout title="Form Puskesmas / Rumah Sakit">
-      <h2 style={{ textAlign: "center" }}>Form Puskesmas / Rumah Sakit</h2>
-      <div style={{ display: "flex", justifyContent: "center" }}>
+<h2 className="text-center">Form Puskesmas / Rumah Sakit</h2>
+<div className="flex-center">
         <FormViewAkun />
       </div>
     </MainLayout>

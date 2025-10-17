@@ -30,3 +30,24 @@ export const parsingDate = (datenya: any) => {
   }
   return rtr;
 };
+
+// Mengembalikan nama bulan Indonesia dari angka 1-12
+export const namaBulanId = (bulanAngka: number): string => {
+  const namaBulan = [
+    "", // placeholder untuk index 0
+    "Januari",
+    "Februari",
+    "Maret",
+    "April",
+    "Mei",
+    "Juni",
+    "Juli",
+    "Agustus",
+    "September",
+    "Oktober",
+    "November",
+    "Desember",
+  ];
+  const idx = Number(bulanAngka) || 0;
+  return namaBulan[idx] ?? "";
+};

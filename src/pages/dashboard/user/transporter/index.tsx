@@ -330,7 +330,7 @@ const Index: React.FC = () => {
             <Button
               onClick={() => toFormPage(record)}
               icon={<EditOutlined />}
-              style={{ backgroundColor: "yellow" }}
+              className="btn-yellow"
             >
               Edit
             </Button>
@@ -447,7 +447,7 @@ const Index: React.FC = () => {
         <Col>
           <Button
             icon={<ReloadOutlined />}
-            style={{ marginLeft: 15, backgroundColor: "orange" }}
+            className="ml-15 btn-orange"
             onClick={getData}
           >
             Reload
@@ -455,9 +455,7 @@ const Index: React.FC = () => {
         </Col>
       </Row>
 
-      <div
-        style={{ marginTop: "20px", marginBottom: "20px", overflowX: "auto" }}
-      >
+      <div className="mt-20 mb-20 overflow-x-auto">
         <Table
           scroll={{ x: 800 }} // Set a minimum width to trigger horizontal scrolling
           columns={columns}

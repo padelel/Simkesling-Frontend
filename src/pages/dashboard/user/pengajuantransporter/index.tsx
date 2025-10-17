@@ -1,4 +1,5 @@
 import MainLayout from "@/components/MainLayout";
+import styles from "./index.module.css";
 import {
   Button,
   Space,
@@ -201,7 +202,7 @@ const Index: React.FC = () => {
             <Button
               onClick={() => toFormPage(record)}
               icon={<EditOutlined />}
-              style={{ backgroundColor: "yellow" }}>
+              className={styles.btnEdit}>
               Edit
             </Button>
             <Button
@@ -312,7 +313,7 @@ const Index: React.FC = () => {
         <Col>
           <Button
             icon={<ReloadOutlined />}
-            style={{ marginLeft: 15, backgroundColor: "orange" }}
+            className={styles.btnReload}
             onClick={getData}>
             Reload
           </Button>
@@ -322,27 +323,19 @@ const Index: React.FC = () => {
         <Link
           href="/dashboard/user/pengajuantransporter/PagePengajuanTransporter"
           passHref>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              marginBottom: 20,
-            }}>
+          <div className={styles.addContainer}>
             <Button
               type="primary"
               size="large"
               icon={<PlusCircleOutlined />}
-              style={{ boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)" }}>
+              className={styles.btnAddShadow}>
               Tambah Transporter
             </Button>
           </div>
         </Link>
       </div>
 
-      <div
-        style={{
-          overflowX: "auto",
-        }}>
+      <div className={styles.tableWrapper}>
         {/* <Search
           style={{
             width: 300,

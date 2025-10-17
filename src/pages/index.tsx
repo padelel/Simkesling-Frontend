@@ -40,31 +40,13 @@ const LandingPage: React.FC = () => {
 
   return (
     <>
-      <style jsx global>{`
-        body {
-          margin: 0;
-          padding: 0;
-        }
-      `}</style>
-      <Space direction="vertical" size="large" style={{ display: "flex" }}>
+      <Space direction="vertical" size="large" className="space-block w-full">
         <HeaderLanding />
         <CarrouselLanding />
         <Overview />
 
-        <Footer
-          style={{
-            borderTop: "1px solid #e8e8e8",
-            backgroundColor: "#007BFF",
-            color: "#fff",
-            textAlign: "center",
-          }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexDirection: "column", // Mengubah tata letak menjadi kolom di ponsel
-            }}>
+        <Footer className="border-t-light bg-blue text-white text-center">
+          <div className="container mx-auto d-flex justify-between items-center flex-col text-center">
             {/*<div style={{ width: "100%" }}>
               <h2 style={{ color: "#fff" }}>
                 Lokasi Dinas Kesehatan Kota Depok
@@ -76,19 +58,19 @@ const LandingPage: React.FC = () => {
                 style={{ border: "" }}
                 loading="lazy"></iframe>
             </div>*/}
-            <div style={{ width: "100%" }}>
-              <h2 style={{ color: "#fff" }}>Kontak</h2>
+            <div className="w-full">
+              <h2 className="text-white">Kontak</h2>
               <p>
-                <PhoneOutlined style={{ color: "#fff", marginRight: "5px" }} />
+                <PhoneOutlined className="text-white mr-5" />
                 Nomor Telepon: 02129402281
               </p>
               <p>
-                <MailOutlined style={{ color: "#fff", marginRight: "5px" }} />
+                <MailOutlined className="text-white mr-5" />
                 Email: dinkes@depok.go.id
               </p>
               <p>
                 <EnvironmentOutlined
-                  style={{ color: "#fff", marginRight: "5px" }}
+                  className="text-white mr-5"
                 />
                 Lokasi: Gedung Baleka II, Jl. Margonda Raya No.54, Depok, Kec. Pancoran Mas, Kota Depok, Jawa Barat 16431
               </p>
@@ -118,7 +100,7 @@ const LandingPage: React.FC = () => {
               <YoutubeOutlined style={{ fontSize: "24px", color: "#fff" }} />
             </a>
           </div> */}
-          <p>&copy; {new Date().getFullYear()} D&apos;Smiling Dinkes Kota Depok</p>
+          <p className="text-center">&copy; {new Date().getFullYear()} D&apos;Smiling Dinkes Kota Depok</p>
         </Footer>
       </Space>
     </>

@@ -22,7 +22,7 @@ import { useGlobalStore } from "@/stores/globalStore";
 // Lazy load chart component for better performance
 const Chart = dynamic(() => import("react-apexcharts"), { 
   ssr: false,
-  loading: () => <div style={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading Chart...</div>
+  loading: () => <div className="h-400 flex-center items-center">Loading Chart...</div>
 });
 
 // Types for better type safety
@@ -513,7 +513,7 @@ const DashboardLimbahCairPage: React.FC = () => {
                 onChange={handleChangeInput}
                 maxLength={4}
                 name="tahun"
-                style={{ width: 200 }}
+                className="w-200"
               />
             </Form.Item>
             <Form.Item>
@@ -532,7 +532,7 @@ const DashboardLimbahCairPage: React.FC = () => {
             description={pesan}
             type="warning"
             showIcon
-            style={{ marginBottom: 16 }}
+            className="mb-16"
           />
         )}
         {lapor && (
@@ -541,12 +541,11 @@ const DashboardLimbahCairPage: React.FC = () => {
             description={pesan}
             type="success"
             showIcon
-            style={{ marginBottom: 16 }}
+            className="mb-16"
           />
         )}
 
-        <div
-          style={{ marginTop: 30, display: "flex", justifyContent: "center", flexDirection: "column", alignItems: "center" }}>
+        <div className="mt-30 flex-col-center">
           <Row>
             <Col>
               {typeof window !== undefined && (
@@ -562,8 +561,8 @@ const DashboardLimbahCairPage: React.FC = () => {
           </Row>
           
           {/* Keterangan Satuan Data */}
-          <div style={{ marginTop: 20, textAlign: 'center', padding: '16px', backgroundColor: '#f0f2f5', borderRadius: '8px', maxWidth: '600px' }}>
-            <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>
+          <div className="mt-20 info-box text-center">
+            <p className="info-text">
               <strong>Keterangan:</strong> Data limbah cair menggunakan berbagai satuan: pH (tanpa satuan), BOD/COD/TSS/Minyak & Lemak/Amoniak dalam <strong>mg/l</strong>, Total Coliform dalam <strong>MPN/100ml</strong>, dan Debit Air Limbah dalam <strong>M³/bulan</strong>
             </p>
           </div>

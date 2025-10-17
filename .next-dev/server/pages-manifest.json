@@ -1,0 +1,9 @@
+{
+  "/_app": "pages/_app.js",
+  "/_error": "pages/_error.js",
+  "/_document": "pages/_document.js",
+  "/dashboard/user": "pages/dashboard/user.js",
+  "/dashboard/user/limbah-padat": "pages/dashboard/user/limbah-padat.js",
+  "/dashboard/user/lab-lainnya": "pages/dashboard/user/lab-lainnya.js",
+  "/dashboard/user/limbah-cair": "pages/dashboard/user/limbah-cair.js"
+}

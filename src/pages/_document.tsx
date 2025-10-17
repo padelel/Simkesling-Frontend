@@ -3,6 +3,8 @@ import { StyleProvider, createCache, extractStyle } from '@ant-design/cssinjs';
 import Document, { Head, Html, Main, NextScript } from 'next/document';
 import type { DocumentContext } from 'next/document';
 
+const nonce = process.env.CSP_NONCE || 'DEVSCAN123';
+
 const MyDocument = () => (
   <Html lang="en">
     <Head />
@@ -19,7 +21,7 @@ MyDocument.getInitialProps = async (ctx: DocumentContext) => {
   ctx.renderPage = () =>
     originalRenderPage({
       enhanceApp: (App) => (props) => (
-        <StyleProvider cache={cache}>
+        <StyleProvider cache={cache} nonce={nonce}>
           <App {...props} />
         </StyleProvider>
       ),
@@ -32,10 +34,12 @@ MyDocument.getInitialProps = async (ctx: DocumentContext) => {
     styles: (
       <>
         {initialProps.styles}
-        <style dangerouslySetInnerHTML={{ __html: style }} />
+        <style nonce={nonce} dangerouslySetInnerHTML={{ __html: style }} />
       </>
     ),
   };
 };
 
 export default MyDocument;
+
+

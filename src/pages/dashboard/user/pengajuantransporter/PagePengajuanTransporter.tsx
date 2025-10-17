@@ -1,4 +1,5 @@
 import MainLayout from "@/components/MainLayout";
+import styles from "./index.module.css";
 import FormPengajuanTransporter from "@/components/formpuskesmas/pengajuantransport/FormPengajuanTransporter";
 import router from "next/router";
 import React from "react";
@@ -11,8 +12,8 @@ const PagePengajuanTransporter = () => {
 
   return (
     <MainLayout title="Pengajuan Transporter">
-      <h2 style={{ textAlign: "center" }}>Form Pengajuan Transporter</h2>
-      <div style={{ display: "flex", justifyContent: "center" }}>
+      <h2 className={styles.titleCenter}>Form Pengajuan Transporter</h2>
+      <div className={styles.centerContainer}>
         <FormPengajuanTransporter />
       </div>
     </MainLayout>

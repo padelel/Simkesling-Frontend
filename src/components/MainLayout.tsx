@@ -219,27 +219,25 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, title }) => {
   };
 
   useEffect(() => {
-    // const cookieStore = cookies();
-    let token = cookie.get("token");
-    let user = token ? jwt_decode(token) : null;
-    let level = user.level;
-    console.log(level);
-    console.log(user);
-    console.log(token);
+    // Ambil token dari cookie atau localStorage secara aman
+    const token = cookie.get("token") || (typeof window !== 'undefined' ? localStorage.getItem("token") : "");
+
+    // Decode token secara defensif (hindari crash saat token belum tersedia)
+    let user: any = null;
+    try {
+      user = token ? jwt_decode(token) : null;
+    } catch (e) {
+      // abaikan error decode jika token belum valid/tersedia
+    }
+
+    const level = user?.level?.toString() || "";
 
     let menu = tmpItems.filter((val) => {
       if (val.level == undefined || val.level == null) return true;
-      let cekAdmin = level == "1" && val.level == "admin";
-      let cekUser = level != "1" && val.level != "admin";
-      console.log("--cekAdmin");
-      console.log(cekAdmin);
-      console.log("--cekUser");
-      console.log(cekUser);
+      const cekAdmin = level === "1" && val.level === "admin";
+      const cekUser = level !== "1" && val.level !== "admin";
       if (cekAdmin) return true;
       if (cekUser) return true;
-      // else return true;
-      // return level === "1" && val.level == "admin";
-      // return level !== "1" && val.level == "user";
     });
 
     setItems(menu);

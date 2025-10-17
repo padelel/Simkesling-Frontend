@@ -6,8 +6,8 @@ import React from "react";
 const PagePengajuanTransporter = () => {
   return (
     <MainLayout title={"Transporter"}>
-      <h2 style={{ textAlign: "center" }}>{"Form Transporter"}</h2>
-      <div style={{ display: "flex", justifyContent: "center" }}>
+<h2 className="text-center">{"Form Transporter"}</h2>
+<div className="flex-center">
         <FormTransporter />
       </div>
     </MainLayout>

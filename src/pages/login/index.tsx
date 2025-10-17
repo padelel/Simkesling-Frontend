@@ -8,10 +8,10 @@ const LoginPage = () => {
   const globalStore = useGlobalStore();
   return (
     <>
-      <Space direction="vertical" size="large" style={{ display: "flex" }}>
+      <Space direction="vertical" size="large" className="d-flex">
         <HeaderLanding />
         <Spin spinning={globalStore.isloading}>
-          <FormLogin />;
+          <FormLogin />
         </Spin>
       </Space>
     </>

@@ -22,6 +22,7 @@ import { useLaporanBulananStore } from "@/stores/laporanBulananStore";
 import { useGlobalStore } from "@/stores/globalStore";
 import cloneDeep from "clone-deep";
 import { parsingDate } from "@/utils/common";
+import Notif from "@/utils/Notif";
 
 // Function to format date with day, month name, and time
 const formatDateWithDayMonthYearTime = (dateString: string) => {
@@ -105,6 +106,20 @@ const Index: React.FC = () => {
   const laporanBulananStore = useLaporanBulananStore();
   const globalStore = useGlobalStore();
   const router = useRouter();
+
+  // Tampilkan flash notifikasi jika ada setelah redirect dari form
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const raw = sessionStorage.getItem("flashNotif");
+        if (raw) {
+          const { type, title, desc, duration } = JSON.parse(raw);
+          Notif(type || "success", title || "Berhasil", desc || "Berhasil diproses", duration || 5);
+          sessionStorage.removeItem("flashNotif");
+        }
+      }
+    } catch {}
+  }, []);
 
   // Fungsi untuk mengurutkan bulan secara kronologis
   const getMonthOrder = (monthName: string): number => {
@@ -191,7 +206,7 @@ const Index: React.FC = () => {
             <Button
               onClick={() => toFormPage(record)}
               icon={<EditOutlined />}
-              style={{ backgroundColor: "yellow" }}>
+              className="btn-yellow">
               Edit
             </Button>
             <Button
@@ -281,7 +296,7 @@ const Index: React.FC = () => {
           <Input
             onChange={handleChangeInput}
             value={search}
-            style={{ boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.2)" }}
+            className="shadow-medium"
             name="search"
             placeholder="Cari Berdasrkan Nama Transporter"
           />
@@ -289,7 +304,7 @@ const Index: React.FC = () => {
         <Col>
           <Button
             icon={<ReloadOutlined />}
-            style={{ marginLeft: 15, backgroundColor: "orange" }}
+            className="ml-15 btn-orange"
             onClick={getData}>
             Reload
           </Button>
@@ -299,20 +314,19 @@ const Index: React.FC = () => {
         <Link
           href="/dashboard/user/limbah-padat/PageTambahLimbah?action=create"
           passHref>
-          <div style={{ display: "flex", justifyContent: "center" }}>
+          <div className="flex-center">
             <Button
               type="primary"
               size="large"
               icon={<PlusCircleOutlined />}
-              style={{ boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)" }}>
+              className="shadow-soft">
               Tambah Laporan Limbah B3
             </Button>
           </div>
         </Link>
       </div>
 
-      <div
-        style={{ marginTop: "20px", marginBottom: "20px", overflowX: "auto" }}>
+      <div className="mt-20 mb-20 overflow-x-auto">
         <Table
           scroll={{ x: 800 }} // Set a minimum width to trigger horizontal scrolling
           columns={columns}

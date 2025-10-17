@@ -382,65 +382,20 @@ const FormPengajuanTransporter: React.FC = () => {
         openNotificationUpdate("success");
       }
       openNotificationCreate("success");
+      try {
+        const flashPayload = {
+          type: "success",
+          message: router.query.action == "edit" ? "Pengajuan transporter berhasil diupdate" : "Pengajuan transporter berhasil disimpan",
+          description: router.query.action == "edit" ? "Data pengajuan transporter berhasil diupdate." : "Data pengajuan transporter berhasil dibuat.",
+        };
+        sessionStorage.setItem("flashNotif", JSON.stringify(flashPayload));
+      } catch (err) {}
       setTimeout(() => {
         router.push("/dashboard/user/pengajuantransporter");
       }, 3000);
       // router.push("/dashboard/user/pengajuantransporter");
     } catch (e) {
       console.error(e);
-    } finally {
-      if (globalStore.setLoading) globalStore.setLoading(false);
-    }
-  };
-
-  // -- onSubmit
-  // const ifTolak = async () => {
-
-  // };
-
-  const getFile = async (file: any) => {
-    try {
-      if (globalStore.setLoading) globalStore.setLoading(true);
-      let arrname = file.split("/");
-      let filename = arrname[arrname.length - 1];
-      const resp = await apifile.get(
-        `${file}?${Math.random().toString().replaceAll(".", "")}`,
-        {
-          responseType: "arraybuffer",
-        }
-      ); // Set responseType to 'arraybuffer'
-      const filenya = resp.data;
-      const typefile = resp.headers["content-type"];
-
-      // Create a Blob from the response data
-      const blob = new Blob([filenya], { type: typefile });
-
-      // Create a Blob URL
-      const blobUrl = URL.createObjectURL(blob);
-      // fileListList.push([
-      //   {
-      //     uid: new Date().toISOString(),
-      //     name: filename,
-      //     status: "done",
-      //     url: blobUrl,
-      //   },
-      // ]);
-      return {
-        uid: new Date().toISOString(),
-        name: filename,
-        status: "done",
-        url: blobUrl,
-        blob: blob,
-      };
-
-      // Open the Blob URL in a new tab
-      // window.open(blobUrl, "_blank");
-
-      // Release the Blob URL when done to avoid memory leaks
-      // URL.revokeObjectURL(blobUrl);
-    } catch (error) {
-      console.error("-- error in getfile --");
-      console.error("Error fetching or processing data:", error);
     } finally {
       if (globalStore.setLoading) globalStore.setLoading(false);
     }
@@ -894,3 +849,9 @@ const FormPengajuanTransporter: React.FC = () => {
 };
 
 export default FormPengajuanTransporter;
+
+
+
+
+
+

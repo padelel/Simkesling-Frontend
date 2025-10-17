@@ -374,7 +374,15 @@ const FormPengajuanTransporter: React.FC = () => {
       } else {
         openNotificationCreate("success");
       }
-      router.push("/dashboard/user/transporter");
+      try {
+  const flashPayload = {
+    type: "success",
+    message: router.query.action == "edit" ? "Transporter berhasil diupdate" : "Transporter berhasil disimpan",
+    description: router.query.action == "edit" ? "Data transporter berhasil diupdate." : "Data transporter berhasil dibuat.",
+  };
+  sessionStorage.setItem("flashNotif", JSON.stringify(flashPayload));
+} catch (err) {}
+router.push("/dashboard/user/transporter");
     } catch (e) {
       console.error(e);
     } finally {
@@ -541,7 +549,15 @@ const FormPengajuanTransporter: React.FC = () => {
         transporterStore.id_transporter == null ||
         transporterStore.id_transporter == 0
       ) {
-        router.push("/dashboard/user/transporter");
+        try {
+  const flashPayload = {
+    type: "success",
+    message: router.query.action == "edit" ? "Transporter berhasil diupdate" : "Transporter berhasil disimpan",
+    description: router.query.action == "edit" ? "Data transporter berhasil diupdate." : "Data transporter berhasil dibuat.",
+  };
+  sessionStorage.setItem("flashNotif", JSON.stringify(flashPayload));
+} catch (err) {}
+router.push("/dashboard/user/transporter");
         return;
       }
       // jika edit set valuenya
@@ -862,3 +878,5 @@ const FormPengajuanTransporter: React.FC = () => {
 };
 
 export default FormPengajuanTransporter;
+
+

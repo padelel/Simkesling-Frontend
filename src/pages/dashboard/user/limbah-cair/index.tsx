@@ -10,6 +10,7 @@ import {
 } from "antd";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
+import Notif from "@/utils/Notif";
 import { Table } from "antd";
 import type { ColumnsType, TableProps } from "antd/es/table";
 import api from "../../../../utils/HttpRequest";
@@ -185,7 +186,7 @@ const Index: React.FC = () => {
           <Space size="middle">
             <Button
               icon={<EditOutlined />}
-              style={{ backgroundColor: "yellow" }}
+              className="btn-yellow"
               onClick={() => {
                 // Store data in localStorage with proper transporter name
                 const editData = {
@@ -298,6 +299,20 @@ const Index: React.FC = () => {
   useEffect(() => {
     getData();
   }, []);
+  // Tampilkan flash notifikasi setelah redirect dari form
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("flash_notif");
+      if (raw) {
+        const payload = JSON.parse(raw);
+        Notif(payload.type || "success", payload.title || "Berhasil", payload.description || "Operasi berhasil");
+        sessionStorage.removeItem("flash_notif");
+      }
+    } catch (err) {
+      console.warn("Gagal memproses flash_notif:", err);
+      sessionStorage.removeItem("flash_notif");
+    }
+  }, []);
 
   return (
     <MainLayout title="Laporan Limbah Cair">
@@ -306,7 +321,7 @@ const Index: React.FC = () => {
           <Input
             onChange={handleSearchInput}
             value={search}
-            style={{ boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.2)" }}
+            className="shadow-medium"
             name="search"
             placeholder="Cari Berdasarkan Periode atau Tahun"
           />
@@ -314,7 +329,7 @@ const Index: React.FC = () => {
         <Col>
           <Button
             icon={<ReloadOutlined />}
-            style={{ marginLeft: 15, backgroundColor: "orange" }}
+            className="ml-15 btn-orange"
             onClick={getData}>
             Reload
           </Button>
@@ -324,20 +339,19 @@ const Index: React.FC = () => {
         <Link
           href="/dashboard/user/limbah-cair/PageTambahLimbah?action=create"
           passHref>
-          <div style={{ display: "flex", justifyContent: "center" }}>
+          <div className="flex-center">
             <Button
               type="primary"
               size="large"
               icon={<PlusCircleOutlined />}
-              style={{ boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)" }}>
+              className="shadow-soft">
               Tambah Laporan Limbah Cair
             </Button>
           </div>
         </Link>
       </div>
 
-      <div
-          style={{ marginTop: "20px", marginBottom: "20px", overflowX: "auto" }}>
+      <div className="mt-20 mb-20 overflow-x-auto">
           <Table
             scroll={{ x: 800 }}
             columns={columns}
@@ -350,3 +364,10 @@ const Index: React.FC = () => {
 };
 
 export default Index;
+
+
+
+
+
+
+

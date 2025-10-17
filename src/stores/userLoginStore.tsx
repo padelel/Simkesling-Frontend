@@ -5,7 +5,7 @@ import api from "@/utils/HttpRequest";
 // import jwt_decode from "jwt-decode";
 // import { Cookie } from "next/font/google";
 import Cookies from "js-cookie";
-import Notif from "@/utils/Notif";
+// Hindari pemanggilan Notif statis dari store agar tidak muncul warning dynamic theme
 // import { useRouter } from "next/router";
 import { AxiosError } from "axios";
 
@@ -74,42 +74,76 @@ export const useUserLoginStore = create<UserLoginState>((set) => ({
     set({ ...payload });
   },
   prosesLogin: async (form_username, form_password) => {
-    // Menggunakan FormData jika backend Anda memerlukannya
-    let dataForm = new FormData();
-    if(form_username) dataForm.append("username", form_username);
-    if(form_password) dataForm.append("password", form_password);
+    // Kirim sebagai JSON agar cocok dengan default Content-Type: application/json
+    const payload = {
+      username: form_username ?? "",
+      password: form_password ?? "",
+    };
 
     try {
       // Axios sudah dikonfigurasi dengan withCredentials: true
-      const resp = await api.post("/login", dataForm, {
-        headers: {
-            // Jika menggunakan FormData, biarkan browser mengatur Content-Type
-            // 'Content-Type': 'multipart/form-data',
+      const resp = await api.post("/login", payload);
+      console.debug("[login] resp.status:", resp?.status, "resp.data:", resp?.data);
+
+      // Robust parse: jika body berformat string, coba JSON.parse atau potong bagian JSON
+      let body: any = resp?.data ?? {};
+      if (typeof body === 'string') {
+        try {
+          body = JSON.parse(body);
+        } catch (err) {
+          try {
+            const start = body.indexOf('{');
+            const end = body.lastIndexOf('}');
+            if (start >= 0 && end > start) {
+              body = JSON.parse(body.slice(start, end + 1));
+            }
+          } catch {}
         }
-      });
+      }
 
-      // --- PERBAIKAN DI SINI ---
-      // Respons backend sekarang tidak berisi token, tapi data user
-      if (resp.status === 200 && resp.data.data.user) {
-        const user = resp.data.data.user as MUser['user'];
+      // Normalisasi struktur response ala ResponseBuilder
+      const payloadData = (body?.data && typeof body.data === 'object') ? body.data : body;
+      const successFlag = (body?.success === true) || (resp?.status === 200);
+      const backendMsg = (body?.message || "").toString();
+      console.debug("[login] parsed body keys:", Object.keys(body || {}), "payloadData keys:", Object.keys(payloadData || {}));
 
-        // HAPUS penyimpanan token
-        // const token = dataUser.token ?? "";
-        // localStorage.setItem("token", token);
-        // Cookies.set("token", token, { expires: 1 });
+      // Respons backend berisi user dan token untuk Bearer auth
+      const userCandidate = (payloadData?.user ?? body?.user) as MUser['user'] | undefined;
+      const tokenCandidate = (payloadData?.token ?? body?.token) as string | undefined;
 
-        // TETAP simpan data user di localStorage untuk persistensi UI
+      if (successFlag && userCandidate) {
+        const user = userCandidate as MUser['user'];
+        const token = tokenCandidate || "";
+
+        // Simpan token untuk Authorization Bearer di request selanjutnya
+        if (token) {
+          localStorage.setItem("token", token);
+          Cookies.set("token", token, { expires: 1 });
+        }
+
+        // Simpan data user untuk persistensi UI
         localStorage.setItem("user", JSON.stringify(user));
 
-        // TETAP set cookie non-sensitif untuk kemudahan akses jika perlu
+        // Update state store agar komponen lain yang berlangganan store langsung mendapatkan user/token
+        try {
+          set({ user, token });
+        } catch {}
+
+        // Cookie non-sensitif
         if(form_username) Cookies.set("username", form_username, { expires: 1 });
         Cookies.set("nama_user", user?.nama_user ?? "", { expires: 1 });
-        
-        Notif("success", "Success Login.!");
+
+        // Notifikasi dipindah ke komponen pemanggil (FormLogin) menggunakan useNotification
+        // Fallback redirect jika komponen pemanggil tidak melakukan navigasi
+        try {
+          const target = (user?.level === "1" || user?.level === 1) ? "/dashboard/admin" : "/dashboard/user";
+          console.debug("[login] user.level:", user?.level, "target:", target);
+        } catch {}
         return user; // Kembalikan objek user
       }
-      
-      Notif("error", "Gagal Login.!", "Respons server tidak sesuai.");
+
+      // Tampilkan peringatan dari store, komponen akan menampilkan notifikasi
+      console.warn("[login] gagal, payload tidak berisi user. status:", resp?.status, "success:", successFlag, "msg:", backendMsg, "payload keys:", Object.keys(payloadData || {}));
       return null;
 
     } catch (e: any) {
@@ -118,8 +152,7 @@ export const useUserLoginStore = create<UserLoginState>((set) => ({
         msg = e.response?.data?.message?.toString() || "Terjadi kesalahan";
       }
       console.error("-- prosesLogin Error --", e);
-      Notif("error", "Gagal Login.!", msg);
-      return null;
+      return null; // Jangan lempar error agar tidak memicu overlay runtime error
     }
   },
   prosesLogout: async () => {
@@ -129,7 +162,7 @@ export const useUserLoginStore = create<UserLoginState>((set) => ({
     Cookies.remove("username");
     Cookies.remove("token"); // Hapus sisa token lama jika ada
     Cookies.remove("nama_user");
-    await Notif("success", "Success Logout.!");
+    // Notifikasi logout dipindah ke komponen pemanggil (misalnya MainLayout)
     window.location.href = "/"; // Redirect ke halaman utama
   },
 }));

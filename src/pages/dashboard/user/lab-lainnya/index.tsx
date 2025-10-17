@@ -140,7 +140,7 @@ const Index: React.FC = () => {
             <Button
               onClick={() => toFormPage(record)}
               icon={<EditOutlined />}
-              style={{ backgroundColor: "yellow" }}>
+              className="btn-yellow">
               Edit
             </Button>
             <Button
@@ -227,7 +227,7 @@ const Index: React.FC = () => {
           <Input
             onChange={handleChangeInput}
             value={search}
-            style={{ boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.2)" }}
+            className="shadow-medium"
             name="search"
             placeholder="Cari Berdasarkan Periode"
           />
@@ -235,7 +235,7 @@ const Index: React.FC = () => {
         <Col>
           <Button
             icon={<ReloadOutlined />}
-            style={{ marginLeft: 15, backgroundColor: "orange" }}
+            className="ml-15 btn-orange"
             onClick={getData}>
             Reload
           </Button>
@@ -245,20 +245,19 @@ const Index: React.FC = () => {
         <Link
           href="/dashboard/user/lab-lainnya/PageTambahLab?action=create"
           passHref>
-          <div style={{ display: "flex", justifyContent: "center" }}>
+          <div className="flex-center">
             <Button
               type="primary"
               size="large"
               icon={<PlusCircleOutlined />}
-              style={{ boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)" }}>
+              className="shadow-soft">
               Tambah Laporan Pemeriksaan Lab Lainnya
             </Button>
           </div>
         </Link>
       </div>
 
-      <div
-        style={{ marginTop: "20px", marginBottom: "20px", overflowX: "auto" }}>
+      <div className="mt-20 mb-20 overflow-x-auto">
         <Table
           scroll={{ x: 800 }} // Set a minimum width to trigger horizontal scrolling
           columns={columns}

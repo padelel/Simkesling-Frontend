@@ -17,6 +17,7 @@ import {
 import dynamic from "next/dynamic";
 import cloneDeep from "clone-deep";
 import api from "@/utils/HttpRequest";
+import { namaBulanId } from "@/utils/common";
 import { useGlobalStore } from "@/stores/globalStore";
 
 const DashboardLimbahPadatPage: React.FC = () => {
@@ -225,15 +226,17 @@ const DashboardLimbahPadatPage: React.FC = () => {
       
       let tmpPesan = "";
       let tmpJudulChart = "";
+      const periodeNum = Number(responsenya?.data?.data?.values?.laporan_periode) || 0;
+      const periodeNamaId = namaBulanId(periodeNum);
+      const tahunLaporan = String(responsenya?.data?.data?.values?.laporan_periode_tahun || "");
+
       if (responsenya.data.data.values.sudah_lapor) {
-        tmpPesan = `Anda Sudah Mengisi Laporan Pada Periode ${responsenya.data.data.values.laporan_periode_nama} ${responsenya.data.data.values.laporan_periode_tahun}`;
-        tmpJudulChart = `Berat Total Limbah Padat Tahun ${responsenya.data.data.values.laporan_periode_tahun}
-       ${userLoginStore.user?.nama_user}`;
+        tmpPesan = `Anda Sudah Mengisi Laporan Pada Periode ${periodeNamaId} ${tahunLaporan}`;
       } else {
-        tmpPesan = `Anda Belum Mengisi Laporan Pada Periode ${responsenya.data.data.values.laporan_periode_nama} ${responsenya.data.data.values.laporan_periode_tahun}`;
-        tmpJudulChart = `Berat Total Limbah Padat Tahun ${responsenya.data.data.values.laporan_periode_tahun}
-       ${userLoginStore.user?.nama_user}`;
+        tmpPesan = `Anda Belum Mengisi Laporan Pada Periode ${periodeNamaId} ${tahunLaporan}`;
       }
+      tmpJudulChart = `Berat Total Limbah Padat Tahun ${tahunLaporan}
+       ${userLoginStore.user?.nama_user}`;
       setPesan(tmpPesan);
       setJudulChart(tmpJudulChart);
       setLapor(responsenya.data.data.values.sudah_lapor);
@@ -284,7 +287,7 @@ const DashboardLimbahPadatPage: React.FC = () => {
                 onChange={handleChangeInput}
                 maxLength={4}
                 name="tahun"
-                style={{ width: 200 }}
+                className="w-200"
               />
             </Form.Item>
             <Form.Item>
@@ -312,8 +315,7 @@ const DashboardLimbahPadatPage: React.FC = () => {
           />
         )}
 
-        <div
-          style={{ marginTop: 30, display: "flex", justifyContent: "center", flexDirection: "column", alignItems: "center" }}>
+        <div className="mt-30 flex-col-center">
           <Row>
             <Col>
               {typeof window !== undefined && (
@@ -329,8 +331,8 @@ const DashboardLimbahPadatPage: React.FC = () => {
           </Row>
           
           {/* Keterangan Satuan Data */}
-          <div style={{ marginTop: 20, textAlign: 'center', padding: '16px', backgroundColor: '#f0f2f5', borderRadius: '8px', maxWidth: '600px' }}>
-            <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>
+          <div className="mt-20 info-box text-center">
+            <p className="info-text">
               <strong>Keterangan:</strong> Semua data limbah padat dalam grafik menggunakan satuan <strong>Kilogram (Kg)</strong>
             </p>
           </div>
