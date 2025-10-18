@@ -57,8 +57,6 @@ const cspScan = [
 const nextConfig = {
   reactStrictMode: false,
   poweredByHeader: false,
-  // Use a custom dist dir to avoid Windows EPERM locks on .next
-  distDir: '.next-dev',
   images: {
     domains: imageDomains,
   },
@@ -67,10 +65,6 @@ const nextConfig = {
   },
   eslint: {
     ignoreDuringBuilds: true,
-  },
-  experimental: {
-    // Disable output file tracing to avoid writing trace file on Windows
-    outputFileTracing: false,
   },
   transpilePackages: ['react-apexcharts', 'apexcharts'],
   async headers() {
