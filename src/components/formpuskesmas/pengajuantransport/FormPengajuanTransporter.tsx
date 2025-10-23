@@ -35,7 +35,7 @@ import { fileTypeFromStream } from "file-type";
 import router, { useRouter } from "next/router";
 import cloneDeep from "clone-deep";
 import { useGlobalStore } from "@/stores/globalStore";
-import jwtDecode from "jwt-decode";
+
 import { useUserLoginStore } from "@/stores/userLoginStore";
 
 type NotificationType = "success" | "info" | "warning" | "error";
@@ -494,14 +494,14 @@ const FormPengajuanTransporter: React.FC = () => {
 
     const urlParams = new URLSearchParams(window.location.search);
     const action = urlParams.get("action");
-    let token = localStorage.getItem("token");
-    let user: any = jwtDecode(token ?? "");
-    if (!user) {
+
+    const user: any = userLoginStore.user;
+    if (!user || !user.id_user) {
       router.push("/");
       return;
     }
-    setlinkUploadIzinTransporter(user.link_izin_transporter);
-    setlinkUploadMouTransporter(user.link_mou_transporter);
+    setlinkUploadIzinTransporter(user.link_izin_transporter ?? "");
+    setlinkUploadMouTransporter(user.link_mou_transporter ?? "");
     console.log(user);
 
     // getKecamatanData();
@@ -519,13 +519,11 @@ const FormPengajuanTransporter: React.FC = () => {
         pengajuanTransporterStore.id_transporter_tmp == null
       ) {
         console.log("masuk sini? #2");
-        if (user.level == "1") {
+        if (user.level == "1" || user.level == 1) {
           router.push("/dashboard/admin/manajemen/transporter");
         } else {
           router.push("/dashboard/user/pengajuantransporter");
         }
-        // router.push("/dashboard/user/pengajuantransporter");
-        // router.push("/dashboard/admin/manajemen/transporter");
         return;
       }
       // jika edit set valuenya

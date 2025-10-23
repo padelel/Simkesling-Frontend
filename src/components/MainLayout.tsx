@@ -19,8 +19,6 @@ import Image from "next/image";
 import { useRouter } from "next/router";
 import { useUserLoginStore } from "@/stores/userLoginStore";
 import { useGlobalStore } from "@/stores/globalStore";
-import cookie from "js-cookie";
-import jwt_decode from "jwt-decode";
 import Link from "next/link";
 
 const { Title } = Typography;
@@ -97,6 +95,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, title }) => {
         {
           label: "Laporan Pemeriksaan Lab Lainnya",
           path: "/dashboard/user/lab-lainnya",
+          level: "user",
+        },
+        {
+          label: "Pengisian Laporan",
+          path: "/dashboard/user/laporan-limbah/pengisian-laporan",
           level: "user",
         },
       ],
@@ -219,30 +222,19 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, title }) => {
   };
 
   useEffect(() => {
-    // Ambil token dari cookie atau localStorage secara aman
-    const token = cookie.get("token") || (typeof window !== 'undefined' ? localStorage.getItem("token") : "");
+    const level = (userLoginStore.user?.level ?? "").toString();
 
-    // Decode token secara defensif (hindari crash saat token belum tersedia)
-    let user: any = null;
-    try {
-      user = token ? jwt_decode(token) : null;
-    } catch (e) {
-      // abaikan error decode jika token belum valid/tersedia
-    }
-
-    const level = user?.level?.toString() || "";
-
-    let menu = tmpItems.filter((val) => {
+    const menu = tmpItems.filter((val) => {
       if (val.level == undefined || val.level == null) return true;
       const cekAdmin = level === "1" && val.level === "admin";
       const cekUser = level !== "1" && val.level !== "admin";
       if (cekAdmin) return true;
       if (cekUser) return true;
+      return false;
     });
 
     setItems(menu);
-  }, []);
-
+  }, [userLoginStore.user]);
   return (
     <Layout style={{ minHeight: "100vh" }}>
       {/* STYLING */}

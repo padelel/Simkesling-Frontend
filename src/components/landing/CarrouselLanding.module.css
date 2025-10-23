@@ -1,0 +1,43 @@
+/* Container holds background and overlay */
+.container {
+  width: 100%;
+  min-height: 70vh;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Background variants */
+.bg1 {
+  background: url("../../../public/gambar-carousel/Balaikota-Depok.jpg") lightgray 50% / cover no-repeat;
+  height: 100%;
+  width: 100%;
+}
+
+.bg2 {
+  background: url("../../../public/gambar-carousel/limbah-ilustration.jpg") lightgray 50% / cover no-repeat;
+  height: 100%;
+  width: 100%;
+}
+
+/* Dark overlay to improve text contrast and center content */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 1;
+  padding: 24px;
+  text-align: center;
+}
+
+/* Manual button style for fallback */
+.btnManual {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  margin-right: 2rem;
+  margin-bottom: 2rem;
+}

@@ -38,7 +38,7 @@ import router, { useRouter } from "next/router";
 import { useGlobalStore } from "@/stores/globalStore";
 import apifile from "@/utils/HttpRequestFile";
 import Notif from "@/utils/Notif";
-import jwtDecode from "jwt-decode";
+
 
 const { RangePicker } = DatePicker;
 
@@ -330,19 +330,6 @@ const FormViewLaporanCair: React.FC = () => {
               </td>
             </tr>
             
-            <tr>
-              <td style={{ padding: "8px", fontWeight: "bold" }}>Link Persetujuan Teknis</td>
-              <td style={{ padding: "8px" }}>:</td>
-              <td style={{ padding: "8px" }}>
-                <Button
-                  type="link"
-                  icon={<ExportOutlined />}
-                  onClick={() => window.open(form.link_lab_ipal, "_blank")}
-                >
-                  Buka Link
-                </Button>
-              </td>
-            </tr>
             <tr>
               <td style={{ padding: "8px", fontWeight: "bold" }}>Link Pemeriksaan Limbah Cair</td>
               <td style={{ padding: "8px" }}>:</td>

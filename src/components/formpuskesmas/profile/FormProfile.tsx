@@ -80,10 +80,7 @@ const FormProfile = () => {
     kapasitas_ipal_option: "ada", // "ada" or "tidak_ada"
     link_input_izin_ipal: "",
     link_input_dokumen_lingkungan_rs: "",
-    link_manifest: "",
-    link_logbook: "",
-    link_lab_ipal: "",
-    link_lab_lain: "",
+    link_rincian_teknis: "",
     link_izin_transporter: "",
     link_mou_transporter: "",
   };
@@ -204,10 +201,7 @@ const FormProfile = () => {
       "link_input_dokumen_lingkungan_rs",
       form.link_input_dokumen_lingkungan_rs
     );
-    dataForm.append("link_manifest", form.link_manifest);
-    dataForm.append("link_logbook", form.link_logbook);
-    dataForm.append("link_lab_ipal", form.link_lab_ipal);
-    dataForm.append("link_lab_lain", form.link_lab_lain);
+    dataForm.append("link_rincian_teknis", form.link_rincian_teknis);
     dataForm.append("link_izin_transporter", form.link_izin_transporter);
     dataForm.append("link_mou_transporter", form.link_mou_transporter);
 
@@ -276,10 +270,7 @@ const FormProfile = () => {
       link_input_izin_ipal: user?.link_input_izin_ipal ?? "",
       link_input_dokumen_lingkungan_rs:
         user?.link_input_dokumen_lingkungan_rs ?? "",
-      link_manifest: user?.link_manifest ?? "",
-      link_logbook: user?.link_logbook ?? "",
-      link_lab_ipal: user?.link_lab_ipal ?? "",
-      link_lab_lain: user?.link_lab_lain ?? "",
+      link_rincian_teknis: (user as any)?.link_rincian_teknis ?? "",
       link_izin_transporter: user?.link_izin_transporter ?? "",
       link_mou_transporter: user?.link_mou_transporter ?? "",
     });
@@ -299,10 +290,7 @@ const FormProfile = () => {
       form_inputLinkIzinIpal: user?.link_input_izin_ipal ?? "",
       form_link_input_dokumen_lingkungan_rs:
         user?.link_input_dokumen_lingkungan_rs ?? "",
-      form_link_manifest: user?.link_manifest ?? "",
-      form_link_logbook: user?.link_logbook ?? "",
-      form_link_lab_ipal: user?.link_lab_ipal ?? "",
-      form_link_lab_lain: user?.link_lab_lain ?? "",
+      form_link_rincian_teknis: (user as any)?.link_rincian_teknis ?? "",
       form_link_izin_transporter: user?.link_izin_transporter ?? "",
       form_link_mou_transporter: user?.link_mou_transporter ?? "",
     });
@@ -482,10 +470,7 @@ const FormProfile = () => {
             name="form_link_input_dokumen_lingkungan_rs"
             label="Link Dokumen Lingkungan"
             rules={[
-              {
-                required: form.link_input_dokumen_lingkungan_rs.length < 1,
-                message: "Masukan Link Dokumen Lingkungan",
-              },
+              { required: true, message: "Link dokumen lingkungan wajib diisi." },
             ]}>
             <Input
               style={inputStyles}
@@ -493,84 +478,19 @@ const FormProfile = () => {
               value={form.link_input_dokumen_lingkungan_rs}
               name="link_input_dokumen_lingkungan_rs"
             />
-            <Button
-              style={{ textDecoration: "underline" }}
-              icon={<UploadOutlined />}
-              type="link"
-              onClick={() => window.open(linkDokumenLingkunganRS, "_blank")}>
-              Klik Untuk Upload Dokumen Lingkungan RS
-            </Button>
           </Form.Item>
 
           <Form.Item
-            name="form_link_manifest"
-            label="Link Manifest"
-            rules={[
-              {
-                required: true,
-                message: "Link manifest wajib diisi.",
-              },
-            ]}>
+            name="form_link_rincian_teknis"
+            label="Link Rincian Teknis"
+            rules={[{ required: true, message: "Link rincian teknis wajib diisi." }]}
+          >
             <Input
               style={inputStyles}
               onChange={handleChangeInput}
-              value={form.link_manifest}
-              name="link_manifest"
-              placeholder="Masukkan link manifest"
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="form_link_logbook"
-            label="Link Logbook"
-            rules={[
-              {
-                required: true,
-                message: "Link logbook wajib diisi.",
-              },
-            ]}>
-            <Input
-              style={inputStyles}
-              onChange={handleChangeInput}
-              value={form.link_logbook}
-              name="link_logbook"
-              placeholder="Masukkan link logbook"
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="form_link_lab_ipal"
-            label="Link Lab IPAL"
-            rules={[
-              {
-                required: true,
-                message: "Link lab IPAL wajib diisi.",
-              },
-            ]}>
-            <Input
-              style={inputStyles}
-              onChange={handleChangeInput}
-              value={form.link_lab_ipal}
-              name="link_lab_ipal"
-              placeholder="Masukkan link lab IPAL"
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="form_link_lab_lain"
-            label="Link Lab Lain"
-            rules={[
-              {
-                required: true,
-                message: "Link lab lain wajib diisi.",
-              },
-            ]}>
-            <Input
-              style={inputStyles}
-              onChange={handleChangeInput}
-              value={form.link_lab_lain}
-              name="link_lab_lain"
-              placeholder="Masukkan link lab lain"
+              value={form.link_rincian_teknis}
+              name="link_rincian_teknis"
+              placeholder="Masukkan link rincian teknis"
             />
           </Form.Item>
 
@@ -622,7 +542,6 @@ const FormProfile = () => {
           </Form.Item>
         </Form>
       </div>
-      ;
     </>
   );
 };

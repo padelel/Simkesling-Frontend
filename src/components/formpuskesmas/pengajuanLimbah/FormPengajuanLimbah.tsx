@@ -13,6 +13,7 @@ import {
   UploadFile,
   UploadProps,
   message,
+  Tag,
 } from "antd";
 
 import cloneDeep from "clone-deep";
@@ -37,8 +38,8 @@ import { useLaporanBulananStore } from "@/stores/laporanBulananStore";
 import router from "next/router";
 import { useGlobalStore } from "@/stores/globalStore";
 import apifile from "@/utils/HttpRequestFile";
-import Notif from "@/utils/Notif";
-import jwtDecode from "jwt-decode";
+import { useNotification } from "@/utils/Notif";
+import { useUserLoginStore } from "@/stores/userLoginStore";
 
 const { RangePicker } = DatePicker;
 
@@ -92,8 +93,33 @@ const tabListNoTitle = [
   },
 ];
 
-const FormPengajuanLimbah: React.FC = () => {
+type FormPengajuanLimbahProps = {
+  disableRedirect?: boolean;
+  onSuccess?: (data?: any) => void;
+  initialPeriode?: number | string;
+  initialTahun?: number | string;
+  lockPeriodYear?: boolean;
+  onPeriodYearChange?: (periode: number | string, tahun: number | string) => void;
+  deferSubmit?: boolean;
+  onCollectData?: (data: FormData) => void;
+  onCollectDraft?: (draft: any) => void;
+  draftData?: any;
+};
+
+const FormPengajuanLimbah: React.FC<FormPengajuanLimbahProps> = ({
+  disableRedirect,
+  onSuccess,
+  initialPeriode,
+  initialTahun,
+  lockPeriodYear,
+  onPeriodYearChange,
+  deferSubmit,
+  onCollectData,
+  onCollectDraft,
+  draftData,
+}) => {
   const globalStore = useGlobalStore();
+  const userLoginStore = useUserLoginStore();
   const [formListKey, setFormListKey] = useState(new Date().toISOString());
   const laporanBulananStore = useLaporanBulananStore();
   const [linkUploadManifest, setlinkUploadManifest] = useState("");
@@ -104,28 +130,52 @@ const FormPengajuanLimbah: React.FC = () => {
   const [linkUploadSwaPantau, setlinkSwaPantau] = useState("");
   const [linkUploadUjiLabCair, setlinkUjiLabCair] = useState("");
   const [transporterOptions, setTransporterOptions] = useState<
-    { value: string; label: string; id_transporter: number }[]
+    { value: string; label: React.ReactNode; id_transporter: number; name: string; status?: string; disabled?: boolean }[]
   >([]);
   const [selectedTransporter, setSelectedTransporter] = useState<number | null>(
     null
   );
+  const { showNotification, contextHolder } = useNotification();
 
   const getTransporterData = async () => {
     try {
       const response = await api.post("/user/transporter/data");
-      const responseData = response.data.data.values;
+      const responseData = response.data?.data?.values ?? [];
+      
+      // Process the transporter data into the expected format
+      const processedOptions = responseData.map((transporter: any) => {
+        // Determine Active/Expired from MOU expiry flag
+        const mouFlag = transporter.masa_berlaku_sudah_berakhir; // values: 'belum', '1bulan', 'harih'
+        const isExpired = mouFlag === 'harih' || (() => {
+          // Fallback: compare with masa_berlaku_terakhir if flag missing
+          const end = transporter.masa_berlaku_terakhir ? new Date(transporter.masa_berlaku_terakhir) : null;
+          return end ? Date.now() >= end.getTime() : false;
+        })();
+        const statusInfo = isExpired
+          ? { text: 'Expired', color: 'red' }
+          : { text: 'Active', color: 'green' };
 
-      setTransporterOptions(
-        responseData.map(
-          (item: { nama_transporter: string; id_transporter: number }) => ({
-            value: item.id_transporter.toString(),
-            label: item.nama_transporter,
-            id_transporter: item.id_transporter.toString(),
-          })
-        )
-      );
+        return {
+          value: transporter.id_transporter?.toString() || '',
+          label: (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>{transporter.nama_transporter || 'Nama tidak tersedia'}</span>
+              <Tag color={statusInfo.color}>{statusInfo.text}</Tag>
+            </div>
+          ),
+          id_transporter: transporter.id_transporter || 0,
+          name: transporter.nama_transporter || 'Nama tidak tersedia',
+          status: statusInfo.text,
+          disabled: false // Semua transporter tetap bisa dipilih
+        };
+      });
+      
+      setTransporterOptions(processedOptions);
+      console.log("Loaded transporter options:", processedOptions);
+      
     } catch (error) {
       console.error("Error fetching Transporter data:", error);
+      showNotification("error", "Gagal memuat Transporter", "Tidak dapat memuat daftar transporter.");
     }
   };
 
@@ -166,29 +216,49 @@ const FormPengajuanLimbah: React.FC = () => {
   };
 
   const [form, setForm] = useState(cloneDeep(tmpForm));
-
-  // Auto calculate total limbah B3
-  useEffect(() => {
-    const covid = parseFloat(form.limbah_b3_covid) || 0;
-    const nonmedis = parseFloat(form.limbah_b3_nonmedis) || 0;
-    const jarum = parseFloat(form.limbah_jarum) || 0;
-    const infeksius = parseFloat(form.limbah_padat_infeksius) || 0;
-    const cairB3 = parseFloat(form.debit_limbah_cair) || 0;
-    
-    const total = parseFloat((covid + nonmedis + jarum + infeksius + cairB3).toFixed(2));
-    
-    setForm(prev => ({
-      ...prev,
-      berat_limbah_total: total.toString()
-    }));
-    
-    // Update form instance as well if it exists
-    if (formInstance) {
-      formInstance.setFieldsValue({
-        form_beratLimbah: total.toString()
-      });
+  // Tambahkan state untuk precheck periode
+  const [isPeriodTaken, setIsPeriodTaken] = useState(false);
+  
+  // Fungsi precheck duplikasi periode/tahun pada laporan bulanan
+  const precheckExistingPeriod = async (
+    periodeOverride?: number | string,
+    tahunOverride?: number | string
+  ): Promise<boolean> => {
+    try {
+      const pRaw = typeof periodeOverride !== 'undefined' ? periodeOverride : form.periode;
+      const tRaw = typeof tahunOverride !== 'undefined' ? tahunOverride : form.tahun;
+      const p = parseInt(String(pRaw));
+      const t = parseInt(String(tRaw));
+      // Skip jika belum lengkap atau sedang edit
+      if (isNaN(p) || isNaN(t) || isEditMode) {
+        setIsPeriodTaken(false);
+        return false;
+      }
+      const resp = await api.post('/user/laporan-bulanan/data', { periode: p, tahun: t }).catch(() => null);
+      const arrA = resp?.data?.data; // bentuk: data: []
+      const arrB = resp?.data?.data?.values; // bentuk: data: { values: [] }
+      const list = Array.isArray(arrA) ? arrA : (Array.isArray(arrB) ? arrB : []);
+      const taken = Array.isArray(list) && list.length > 0;
+      setIsPeriodTaken(taken);
+      if (taken) {
+        showNotification(
+          'warning',
+          'Periode sudah ada',
+          'Periode yang dipilih sudah memiliki data. Silakan gunakan mode edit atau pilih periode lain.'
+        );
+      }
+      return taken;
+    } catch (err) {
+      // Abaikan error silent, anggap tidak ada duplikasi
+      setIsPeriodTaken(false);
+      return false;
     }
-  }, [form.limbah_b3_covid, form.limbah_b3_nonmedis, form.limbah_jarum, form.limbah_padat_infeksius, form.debit_limbah_cair]);
+  };
+  
+  // Trigger precheck saat periode/tahun berubah
+  useEffect(() => {
+    precheckExistingPeriod().catch(() => {});
+  }, [form.periode, form.tahun, isEditMode]);
 
   const beforeUploadFileDynamic = (file: RcFile) => {
     return false;
@@ -221,6 +291,8 @@ const FormPengajuanLimbah: React.FC = () => {
       ...form,
       [name]: val,
     });
+    // Lakukan precheck segera setelah perubahan periode
+    precheckExistingPeriod(val, form.tahun).catch(() => {});
   };
 
   const handleSubmit = () => {
@@ -286,30 +358,39 @@ const FormPengajuanLimbah: React.FC = () => {
     try {
       await formInstance.validateFields();
     } catch (err) {
-      Notif("error", "Validasi Gagal", "Lengkapi semua field wajib sebelum menyimpan.");
-      return;
-    }
+      showNotification("error", "Validasi Gagal", "Lengkapi semua field wajib sebelum menyimpan.");
+       return;
+     }
 
-    // Additional guard rails for critical fields
-    if (!form.id_transporter) {
-      Notif("error", "Transporter wajib", "Pilih transporter terlebih dahulu.");
-      return;
-    }
-    if (!form.link_input_manifest || !form.link_input_logbook || !form.link_input_lab_lain) {
-      Notif("error", "Link wajib", "Isi link Manifest, Logbook, dan Hasil Lab Lain.");
-      return;
-    }
+     // Cek duplikasi periode lebih awal di halaman limbah padat (bukan di lab)
+     if (!isEditMode) {
+       const duplicated = await precheckExistingPeriod();
+       if (duplicated) {
+         // Blok lanjut jika periode sudah ada
+         return;
+       }
+     }
 
-    let dataForm: any = new FormData();
-    dataForm.append("oldid", form.oldid);
-    dataForm.append("id_transporter", form.id_transporter);
-    
-    // Add nama_transporter to save transporter name in database
-     const selectedTransporterOption = transporterOptions.find(
-       (option) => option.value === form.id_transporter.toString()
-     );
-     if (selectedTransporterOption) {
-       dataForm.append("nama_transporter", selectedTransporterOption.label);
+     // Additional guard rails for critical fields
+     if (!form.id_transporter) {
+      showNotification("error", "Transporter wajib", "Pilih transporter terlebih dahulu.");
+       return;
+     }
+     if (!form.link_input_manifest || !form.link_input_logbook || !form.link_input_lab_lain) {
+      showNotification("error", "Link wajib", "Isi link Manifest, Logbook, dan Hasil Lab Lain.");
+       return;
+     }
+
+     let dataForm: any = new FormData();
+     dataForm.append("oldid", form.oldid);
+     dataForm.append("id_transporter", form.id_transporter);
+     
+     // Add nama_transporter to save transporter name in database
+      const selectedTransporterOption = transporterOptions.find(
+        (option) => option.value === form.id_transporter.toString()
+      );
+      if (selectedTransporterOption) {
+       dataForm.append("nama_transporter", selectedTransporterOption.name);
        console.log("Sending nama_transporter:", selectedTransporterOption.label);
      } else {
        console.log("No transporter option found for ID:", form.id_transporter);
@@ -342,32 +423,6 @@ const FormPengajuanLimbah: React.FC = () => {
     dataForm.append("limbah_jarum", form.limbah_jarum);
     dataForm.append("limbah_padat_infeksius", form.limbah_padat_infeksius);
 
-    // fileLogbook.forEach((file, index) => {
-    //   console.log(file);
-    //   // return;
-    //   if (file.hasOwnProperty("blob")) {
-    //     // @ts-ignore
-    //     dataForm.append("file_logbook[]", file.blob);
-    //   } else {
-    //     dataForm.append("file_logbook[]", file.originFileObj);
-    //   }
-    //   // console.log(file);
-    // });
-    // console.log(dataForm);
-    // return;
-
-    // fileManifest.forEach((file, index) => {
-    //   console.log(file);
-    //   // return;
-    //   if (file.hasOwnProperty("blob")) {
-    //     // @ts-ignore
-    //     dataForm.append("file_manifest[]", file.blob);
-    //   } else {
-    //     dataForm.append("file_manifest[]", file.originFileObj);
-    //   }
-    //   // return;
-    // });
-
     limbahPadatList.forEach((val, index) => {
       dataForm.append("limbah_padat_kategori[]", val.kategori);
       dataForm.append("limbah_padat_catatan[]", val.catatan);
@@ -376,45 +431,58 @@ const FormPengajuanLimbah: React.FC = () => {
       // return;
     });
 
-    // let responsenya = await api.post("/user/laporan-bulanan/create", dataForm);
-
     let url = "/user/laporan-bulanan/create";
     if (router.query.action == "edit") {
       url = "/user/laporan-bulanan/update";
     }
 
     try {
+      // Jika diminta menunda submit, kumpulkan data dan jangan panggil API
+      if (deferSubmit) {
+        // Lakukan cek duplikasi dulu agar blokir alur wizard jika periode sudah terpakai
+        const duplicated = await precheckExistingPeriod();
+        if (duplicated) {
+          return;
+        }
+        showNotification("info", "Draft disiapkan", "Data Limbah B3 akan disimpan saat submit laporan lab.");
+        if (onCollectData) { try { onCollectData(dataForm); } catch {} }
+        if (onCollectDraft) { try { onCollectDraft(form); } catch {} }
+        if (onSuccess) { try { onSuccess(); } catch {} }
+        if (onPeriodYearChange) { try { onPeriodYearChange(form.periode, form.tahun); } catch {} }
+        return; 
+      }
       if (globalStore.setLoading) globalStore.setLoading(true);
       let responsenya = await api.post(url, dataForm);
-      // Tampilkan notifikasi langsung
-      const serverMsg = (responsenya?.data?.message) ? responsenya.data.message : "Berhasil tambah laporan.!";
-      Notif("success", "Sukses", serverMsg);
-      // Simpan flash notif untuk ditampilkan di halaman daftar setelah redirect
-      try {
-        if (typeof window !== 'undefined') {
-          const flash = { type: "success", title: "Sukses", desc: serverMsg, duration: 5 };
-          sessionStorage.setItem("flashNotif", JSON.stringify(flash));
+       // Tampilkan notifikasi langsung
+       const serverMsg = (responsenya?.data?.message) ? responsenya.data.message : "Berhasil tambah laporan.!";
+       showNotification("success", "Sukses", serverMsg);
+        // Simpan flash notif untuk ditampilkan di halaman daftar setelah redirect
+        try {
+          if (typeof window !== 'undefined') {
+            const flash = { type: "success", title: "Sukses", desc: serverMsg, duration: 5 };
+            sessionStorage.setItem("flashNotif", JSON.stringify(flash));
+          }
+        } catch {}
+       if (onSuccess) { try { onSuccess(responsenya?.data); } catch {} }
+        if (onPeriodYearChange) {
+          try { onPeriodYearChange(form.periode, form.tahun); } catch {}
         }
-      } catch {}
-      console.log(limbahPadatList);
-      console.log(responsenya);
-      router.push("/dashboard/user/limbah-padat");
-    } catch (e) {
-      console.error(e);
-      const status = (e as any)?.response?.status;
-      const message = (e as any)?.response?.data?.message || "Gagal menyimpan laporan.";
-      const details = (e as any)?.response?.data?.data;
-      if (status === 400) {
-        // Show validation error details if available
-        const fields = details ? Object.keys(details).join(", ") : "Form tidak sesuai";
-        Notif("error", "Validasi Tidak Sesuai", `${message}${details ? ` (Field: ${fields})` : ''}`);
-      } else {
-        Notif("error", "Error", message);
-      }
-    } finally {
-      if (globalStore.setLoading) globalStore.setLoading(false);
-    }
-  };
+     } catch (e) {
+       console.error(e);
+       const status = (e as any)?.response?.status;
+       const message = (e as any)?.response?.data?.message || "Gagal menyimpan laporan.";
+       const details = (e as any)?.response?.data?.data;
+       if (status === 400) {
+         // Show validation error details if available
+         const fields = details ? Object.keys(details).join(", ") : "Form tidak sesuai";
+        showNotification("error", "Validasi Tidak Sesuai", `${message}${details ? ` (Field: ${fields})` : ''}`);
+       } else {
+        showNotification("error", "Error", message);
+       }
+     } finally {
+       if (globalStore.setLoading) globalStore.setLoading(false);
+     }
+   };
 
   const handlePreviousButton = () => {
     // Update the activeTabKey2 state
@@ -514,11 +582,11 @@ const FormPengajuanLimbah: React.FC = () => {
   };
 
   useLayoutEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
+    const currentUrl = (typeof window !== 'undefined') ? window.location.href : '';
+    const urlParams = new URLSearchParams((typeof window !== 'undefined') ? window.location.search : '');
     const action = urlParams.get("action");
 
-    let token = localStorage.getItem("token");
-    let user: any = jwtDecode(token ?? "");
+   const user = userLoginStore.user;
     // console.log(user, "tyui");
     if (!user) {
       router.push("/");
@@ -539,19 +607,46 @@ const FormPengajuanLimbah: React.FC = () => {
     // Set edit mode state
     setIsEditMode(action === "edit");
 
-    formInstance.resetFields();
-    setForm(cloneDeep(tmpForm));
-    setLimbahPadatList([]);
+    // When coming back with a draft, do NOT reset form; hydrate from draft instead
+    if (draftData) {
+      const defaultYear = (draftData.tahun != null ? String(draftData.tahun) : (initialTahun != null ? String(initialTahun) : new Date().getFullYear().toString()));
+      const defaultPeriod = (draftData.periode != null ? String(draftData.periode) : (initialPeriode != null ? String(initialPeriode) : (new Date().getMonth() + 1).toString()));
+      const restored: any = { ...cloneDeep(tmpForm), ...draftData, tahun: defaultYear, periode: defaultPeriod };
+      setForm(restored);
+      setSelectedTransporter(restored.id_transporter ? parseInt(String(restored.id_transporter)) : null);
+      formInstance.setFieldsValue({
+        form_tahun: defaultYear,
+        form_periode: defaultPeriod,
+        form_transporter: restored.id_transporter ? String(restored.id_transporter) : undefined,
+        form_catatan: restored.catatan,
+        form_link_input_manifest: restored.link_input_manifest,
+        form_link_input_logbook: restored.link_input_logbook,
+        form_link_input_lab_lain: restored.link_input_lab_lain,
+        form_beratLimbahPadatInfeksius: restored.limbah_padat_infeksius,
+        form_beratLimbahCovid: restored.limbah_b3_covid,
+        form_beratLimbahNonMedis: restored.limbah_b3_nonmedis,
+        form_beratLimbahJarum: restored.limbah_jarum,
+        form_debitLimbah: restored.debit_limbah_cair,
+        form_beratLimbah: restored.berat_limbah_total,
+      });
+    } else {
+      // Fresh mount without draft: reset to defaults
+      formInstance.resetFields();
+      setForm(cloneDeep(tmpForm));
+      setLimbahPadatList([]);
 
-    formInstance.setFieldsValue({
-      form_tahun: new Date().getFullYear(),
-      form_periode: (new Date().getMonth() + 1).toString(),
-    });
-    setForm({
-      ...form,
-      tahun: new Date().getFullYear().toString(),
-      periode: (new Date().getMonth() + 1).toString(),
-    });
+      const defaultYear = (initialTahun != null ? String(initialTahun) : new Date().getFullYear().toString());
+      const defaultPeriod = (initialPeriode != null ? String(initialPeriode) : (new Date().getMonth() + 1).toString());
+      formInstance.setFieldsValue({
+        form_tahun: defaultYear,
+        form_periode: defaultPeriod,
+      });
+      setForm(prev => ({
+        ...prev,
+        tahun: defaultYear,
+        periode: defaultPeriod,
+      }));
+    }
 
     if (action === "edit") {
       console.log("masuk sini? #1");
@@ -559,132 +654,78 @@ const FormPengajuanLimbah: React.FC = () => {
         laporanBulananStore.id_laporan_bulanan == null ||
         laporanBulananStore.id_laporan_bulanan == 0
       ) {
-        console.log("masuk sini? #2");
+        try {
+          const flashPayload = {
+            type: "error",
+            message: "Tidak ada data untuk diedit",
+            description: "Silakan pilih data yang ingin diedit dari daftar.",
+          };
+          sessionStorage.setItem("flashNotif", JSON.stringify(flashPayload));
+        } catch (err) {}
         router.push("/dashboard/user/limbah-padat");
         return;
       }
-      // jika edit set valuenya
-      // setForm({
-      //   oldid: laporanBulananStore.id_laporan_bulanan?.toString() ?? "",
-      //   periode: laporanBulananStore.periode?.toString() ?? "",
-      //   tahun: laporanBulananStore.tahun?.toString() ?? "",
-      //   namatransporter: laporanBulananStore.id_transporter?.toString() ?? "",
-      //   namapemusnah: laporanBulananStore.nama_pemusnah?.toString() ?? "",
-      //   metodepemusnah: laporanBulananStore.metode_pemusnah?.toString() ?? "",
-      //   statustps:
-      //     laporanBulananStore.punya_penyimpanan_tps &&
-      //     [1, "1"].includes(laporanBulananStore.punya_penyimpanan_tps)
-      //       ? 1
-      //       : 0,
-      //   ukurantps: laporanBulananStore.ukuran_penyimpanan_tps?.toString() ?? "",
-      //   catatanlimbahcair: laporanBulananStore.catatan?.toString() ?? "",
-      // });
-      // Create new form object with store data
-      const editFormData = {
-        oldid: laporanBulananStore.id_laporan_bulanan?.toString() ?? "",
-        periode: laporanBulananStore.periode?.toString() ?? "",
-        tahun: laporanBulananStore.tahun?.toString() ?? "",
-        id_transporter: laporanBulananStore.id_transporter?.toString() ?? "0",
-        berat_limbah_total:
-          laporanBulananStore.berat_limbah_total?.toString() ?? "",
-        limbah_b3_covid: laporanBulananStore.limbah_b3_covid?.toString() ?? "",
-        limbah_b3_nonmedis: laporanBulananStore.limbah_b3_nonmedis?.toString() ?? "",
-        catatan: laporanBulananStore.catatan?.toString() ?? "",
-        link_input_manifest:
-          laporanBulananStore.link_input_manifest?.toString() ?? "",
-        link_input_logbook:
-          laporanBulananStore.link_input_logbook?.toString() ?? "",
-        link_input_lab_lain:
-          laporanBulananStore.link_input_lab_lain?.toString() ?? "",
-        link_input_dokumen_lingkungan_rs:
-          laporanBulananStore.link_input_dokumen_lingkungan_rs?.toString() ??
-          "",
-        link_input_swa_pantau:
-          laporanBulananStore.link_input_swa_pantau?.toString() ?? "",
-        link_input_ujilab_cair:
-          laporanBulananStore.link_input_ujilab_cair?.toString() ?? "",
-        limbah_jarum: laporanBulananStore.limbah_jarum?.toString() ?? "",
-        limbah_padat_infeksius:
-          laporanBulananStore.limbah_padat_infeksius?.toString() ?? "",
-        debit_limbah_cair: laporanBulananStore.debit_limbah_cair?.toString() ?? "",
-      };
-      
-      console.log("Edit form data from store:", editFormData);
-      setForm(editFormData);
-
-      setIsCheckboxChecked(
-        laporanBulananStore.punya_penyimpanan_tps &&
-          [1, "1"].includes(laporanBulananStore.punya_penyimpanan_tps)
-          ? true
-          : false
-      );
-      setIsCheckboxChecked1(
-        laporanBulananStore.punya_pemusnahan_sendiri &&
-          [1, "1"].includes(laporanBulananStore.punya_pemusnahan_sendiri)
-          ? true
-          : false
-      );
-
-      const formFieldsData = {
-        form_periode: laporanBulananStore.periode?.toString() ?? "",
-        form_tahun: laporanBulananStore.tahun?.toString() ?? "",
-        form_transporter: laporanBulananStore.id_transporter?.toString() ?? "",
-        form_beratLimbah:
-          laporanBulananStore.berat_limbah_total?.toString() ?? "",
-        form_beratLimbahNonCovid:
-          laporanBulananStore.limbah_b3_nonmedis?.toString() ?? "",
-        form_beratLimbahCovid:
-          laporanBulananStore.limbah_b3_covid?.toString() ?? "",
-        form_beratLimbahJarum:
-          laporanBulananStore.limbah_jarum?.toString() ?? "",
-        form_beratLimbahCairB3:
-          laporanBulananStore.limbah_cair_b3?.toString() ?? "",
-        form_debitLimbah:
-          laporanBulananStore.debit_limbah_cair?.toString() ?? "",
-        form_catatan: laporanBulananStore.catatan?.toString() ?? "",
-        form_link_input_manifest:
-          laporanBulananStore.link_input_manifest?.toString() ?? "",
-        form_link_input_logbook:
-          laporanBulananStore.link_input_logbook?.toString() ?? "",
-        form_link_input_lab_lain:
-          laporanBulananStore.link_input_lab_lain?.toString() ?? "",
-        form_link_input_dokumen_lingkungan_rs:
-          laporanBulananStore.link_input_dokumen_lingkungan_rs?.toString() ??
-          "",
-        form_link_input_swa_pantau:
-          laporanBulananStore.link_input_swa_pantau?.toString() ?? "",
-        form_link_input_ujilab_cair:
-          laporanBulananStore.link_input_ujilab_cair?.toString() ?? "",
-      };
-
-      formInstance.setFieldsValue(formFieldsData);
-      
-      console.log("Edit form data from store:", formFieldsData);
-      setForm(editFormData);
-
-      setIsCheckboxChecked(
-        laporanBulananStore.punya_penyimpanan_tps &&
-          [1, "1"].includes(laporanBulananStore.punya_penyimpanan_tps)
-          ? true
-          : false
-      );
-      setIsCheckboxChecked1(
-        laporanBulananStore.punya_pemusnahan_sendiri &&
-          [1, "1"].includes(laporanBulananStore.punya_pemusnahan_sendiri)
-          ? true
-          : false
-      );
-
-      formInstance.setFieldsValue(editFormData);
-
-      // getFile(pengajuanTransporterStore.files);
-      // getFilesManifest();
-      // getFilesLogbook();
-      // fileManifest;
-      // fileLogbook;
-      getListHere();
     }
   }, []);
+
+  // Prefill data saat edit agar nilai lama tampil
+  useEffect(() => {
+    const isEdit = (typeof window !== 'undefined') && new URLSearchParams(window.location.search).get("action") === "edit";
+    if (!isEdit) return;
+    if (!laporanBulananStore?.id_laporan_bulanan) return;
+
+    const selectedIdTransporter = laporanBulananStore.id_transporter ? laporanBulananStore.id_transporter.toString() : "";
+    const filledForm = {
+      ...form,
+      oldid: laporanBulananStore.id_laporan_bulanan?.toString() || "",
+      id_transporter: selectedIdTransporter,
+      catatan: laporanBulananStore.catatan || "",
+      tahun: laporanBulananStore.tahun?.toString() || "",
+      periode: laporanBulananStore.periode?.toString() || "",
+      link_input_manifest: laporanBulananStore.link_input_manifest || "",
+      link_input_logbook: laporanBulananStore.link_input_logbook || "",
+      link_input_lab_lain: laporanBulananStore.link_input_lab_lain || "",
+      link_input_dokumen_lingkungan_rs: laporanBulananStore.link_input_dokumen_lingkungan_rs || "",
+      limbah_b3_covid: laporanBulananStore.limbah_b3_covid?.toString() || "",
+      limbah_b3_nonmedis: laporanBulananStore.limbah_b3_nonmedis?.toString() || "",
+      limbah_jarum: laporanBulananStore.limbah_jarum?.toString() || "",
+      limbah_padat_infeksius: laporanBulananStore.limbah_padat_infeksius?.toString() || "",
+      debit_limbah_cair: laporanBulananStore.debit_limbah_cair?.toString() || "",
+      berat_limbah_total: laporanBulananStore.berat_limbah_total?.toString() || "",
+    } as any;
+
+    setForm(filledForm);
+    setSelectedTransporter(parseInt(selectedIdTransporter || "0") || null);
+
+    formInstance.setFieldsValue({
+      form_transporter: selectedIdTransporter,
+      form_catatan: filledForm.catatan,
+      form_tahun: filledForm.tahun,
+      form_periode: filledForm.periode,
+      form_link_input_manifest: filledForm.link_input_manifest,
+      form_link_input_logbook: filledForm.link_input_logbook,
+      form_link_input_lab_lain: filledForm.link_input_lab_lain,
+      form_beratLimbahPadatInfeksius: filledForm.limbah_padat_infeksius,
+      form_beratLimbahCovid: filledForm.limbah_b3_covid,
+      form_beratLimbahNonMedis: filledForm.limbah_b3_nonmedis,
+      form_beratLimbahJarum: filledForm.limbah_jarum,
+      form_debitLimbah: filledForm.debit_limbah_cair,
+      form_beratLimbah: filledForm.berat_limbah_total,
+    });
+
+    // Prefill detail dan file jika tersedia
+    try { getListHere(); } catch {}
+    try { getFilesManifest(); } catch {}
+    try { getFilesLogbook(); } catch {}
+
+    // Izinkan transporter yang tersimpan walau status berakhir
+    setTransporterOptions(prev => prev.map(opt => {
+      if (opt.id_transporter === Number(selectedIdTransporter)) {
+        return { ...opt, disabled: false };
+      }
+      return opt;
+    }));
+  }, [laporanBulananStore?.id_laporan_bulanan]);
 
   const inputStyles = {
     width: "350px",
@@ -701,6 +742,33 @@ const FormPengajuanLimbah: React.FC = () => {
     height: "35px",
     boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.2)",
   };
+
+  // Hitung otomatis Total Limbah B3 (berat_limbah_total) dengan pembulatan 1 desimal
+  // Komponen sesuai backend: covid + nonmedis + medis(0) + jarum + sludge_ipal(0) + padat_infeksius + debit_limbah_cair
+  useEffect(() => {
+    const toNum = (v: any) => {
+      const n = parseFloat(String(v ?? 0));
+      return isNaN(n) ? 0 : n;
+    };
+    const totalRaw =
+      toNum(form.limbah_b3_covid) +
+      toNum(form.limbah_b3_nonmedis) +
+      0 + // limbah_b3_medis tidak diinput di UI (default 0)
+      toNum(form.limbah_jarum) +
+      0 + // limbah_sludge_ipal tidak diinput di UI (default 0)
+      toNum(form.limbah_padat_infeksius) +
+      toNum(form.debit_limbah_cair);
+
+    const totalRounded = Math.round(totalRaw * 100) / 100; // bulatkan ke 2 desimal
+    setForm((prev) => ({ ...prev, berat_limbah_total: totalRounded }));
+    try { formInstance.setFieldsValue({ form_beratLimbah: totalRounded }); } catch {}
+  }, [
+    form.limbah_b3_covid,
+    form.limbah_b3_nonmedis,
+    form.limbah_jarum,
+    form.limbah_padat_infeksius,
+    form.debit_limbah_cair,
+  ]);
 
   const contentListNoTitle: Record<string, React.ReactNode> = {
     limbahPadat: (
@@ -726,6 +794,7 @@ const FormPengajuanLimbah: React.FC = () => {
             placeholder="Select a option and change input text above"
             style={{ boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.2)" }}
             allowClear
+            optionLabelProp="name"
             options={transporterOptions}
           ></Select>
         </Form.Item>
@@ -748,21 +817,6 @@ const FormPengajuanLimbah: React.FC = () => {
           {"    "}
           Kg
         </Form.Item>
-        {/* <Form.Item
-          name="form_beratLimbahNonCovid"
-          label="Total Limbah NonCovid"
-          rules={[]}
-        >
-          <InputNumber
-            onChange={(v) => handleChangeSelect(v, "limbah_b3_nonmedis", event)}
-                      value={form.limbah_b3_nonmedis}
-            style={inputNumberStyles}
-            min={0}
-            defaultValue={0}
-          />
-          {"    "}
-          Kg
-        </Form.Item> */}
         <Form.Item
           name="form_beratLimbahCovid"
           label="Total Limbah Covid"
@@ -841,134 +895,20 @@ const FormPengajuanLimbah: React.FC = () => {
             style={{...inputNumberStyles, backgroundColor: '#f5f5f5', cursor: 'not-allowed'}}
             min={0.0}
             step={0.1}
+            precision={2}
           />
           {"    "}
           Kg
         </Form.Item>
         <Divider />
 
-        {/* <Form.List
-          name="detailLimbahDynamic"
-          key={formListKey}
-          initialValue={limbahPadatList}>
-          {(fields, { add, remove }) => (
-            <>
-              {fields.map(({ key, name, ...restField }) => (
-                <Space
-                  key={key}
-                  style={{ display: "flex", marginBottom: 8 }}
-                  align="baseline">
-                  <Form.Item
-                    {...restField}
-                    name={[name, "form_kategoriLimbahPadat"]}
-                    key={"form_kategoriLimbahPadat" + key}
-                    // rules={[
-                    //   { required: true, message: "Masukan Kategori Limbah" },
-                    // ]}
-                    initialValue={
-                      limbahPadatList[name]
-                        ? limbahPadatList[name].kategori ?? ""
-                        : ""
-                    }>
-                    <Input
-                      onChange={(v: any) =>
-                        handleChangeLimbahPadatInput(v, key, name, "kategori")
-                      }
-                      value={
-                        limbahPadatList[name]
-                          ? limbahPadatList[name].kategori ?? ""
-                          : ""
-                      }
-                      name={"kategoridetaillimbah" + key}
-                      key={"kategoridetaillimbahKey" + key}
-                      placeholder="Kategori"
-                      style={inputDetailStyles}
-                    />
-                  </Form.Item>
-                  <Form.Item
-                    {...restField}
-                    name={[name, "form_catatanLimbahPadat"]}
-                    key={"form_catatanLimbahPadat" + key}
-                    rules={[{}]}
-                    initialValue={
-                      limbahPadatList[name]
-                        ? limbahPadatList[name].catatan ?? ""
-                        : ""
-                    }>
-                    <Input
-                      onChange={(v: any) =>
-                        handleChangeLimbahPadatInput(v, key, name, "catatan")
-                      }
-                      value={
-                        limbahPadatList[name]
-                          ? limbahPadatList[name].catatan ?? ""
-                          : ""
-                      }
-                      name={"catatandetaillimbah" + key}
-                      key={"catatandetaillimbahKey" + key}
-                      style={inputDetailStyles}
-                      placeholder="Catatan"
-                    />
-                  </Form.Item>
-                  <Form.Item
-                    {...restField}
-                    name={[name, "form_beratLimbahPadat"]}
-                    key={"form_beratLimbahPadat" + key}
-                    // rules={[
-                    //   { required: true, message: "Masukan Berat Limbah" },
-                    // ]}
-                    initialValue={
-                      limbahPadatList[name]
-                        ? limbahPadatList[name].berat ?? ""
-                        : ""
-                    }>
-                    <Input
-                      onChange={(v: any) =>
-                        handleChangeLimbahPadatInput(v, key, name, "berat")
-                      }
-                      value={
-                        limbahPadatList[name]
-                          ? limbahPadatList[name].berat ?? ""
-                          : ""
-                      }
-                      name="beratdetaillimbah"
-                      key={"beratdetaillimbahKey" + key}
-                      placeholder="Berat"
-                      style={inputDetailStyles}
-                    />
-                  </Form.Item>
-                  <MinusCircleOutlined
-                    onClick={(v) => handleRemoveRowDynamic(remove, key, name)}
-                  />
-                </Space>
-              ))}
-              <Form.Item>
-                <Button
-                  type="dashed"
-                  onClick={() => handleAddRowDynamic(add)}
-                  block
-                  size="large"
-                  icon={<PlusOutlined />}
-                  style={{
-                    backgroundColor: "#FFFF00", // Yellow color
-                    borderColor: "#FFFF00", // You might also want to set the border color
-                    color: "black", // Adjust text color for better visibility
-                    boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)",
-                  }}>
-                  Klik Untuk Menambahkan Detail Limbah Padat
-                </Button>
-              </Form.Item>
-            </>
-          )}
-        </Form.List>
-        <Divider /> */}
         <h3>Upload Catatan</h3>
         <Alert
           message="Perhatikan Ketentuan Upload Dokumen!"
           style={{ marginBottom: 30 }}
           description={
             <div>
-              1. Silahkan Klik Button Text Untuk Menuju Direktori Drive
+              1. Silahkan Buka Google Drive Anda
               <br />
               2. Buat Folder Baru Dengan dan Berikan Penamaan Berdasarkan
               Tanggal
@@ -998,14 +938,6 @@ const FormPengajuanLimbah: React.FC = () => {
               name="link_input_manifest"
               style={inputStyles}
             />
-            <Button
-              style={{ textDecoration: "underline" }}
-              onClick={() => window.open('https://drive.google.com/drive/folders/1FBbOe2WUldZlaDVidPAfl2qJ_VvyOdMZ', '_blank')}
-              icon={<ExportOutlined />}
-              type="link"
-            >
-              Klik Untuk Upload Dokumen Manifest
-            </Button>
           </Form.Item>
         <Form.Item
           name="form_link_input_logbook"
@@ -1022,14 +954,6 @@ const FormPengajuanLimbah: React.FC = () => {
             value={form.link_input_logbook}
             name="link_input_logbook"
           />
-          <Button
-            style={{ textDecoration: "underline" }}
-            icon={<ExportOutlined />}
-            onClick={() => window.open('https://drive.google.com/drive/folders/1LEUP32SK-sxjuoROe1NPoL0MsTqSzJ7I', '_blank')}
-            type="link"
-          >
-            Klik Untuk Upload Dokumen Logbook
-          </Button>
         </Form.Item>
 
         <Divider />
@@ -1049,14 +973,6 @@ const FormPengajuanLimbah: React.FC = () => {
             value={form.link_input_lab_lain}
             name="link_input_lab_lain"
           />
-          <Button
-            style={{ textDecoration: "underline" }}
-            onClick={() => window.open(linkUploadLabLain, "_blank")}
-            icon={<ExportOutlined />}
-            type="link"
-          >
-            Klik Untuk Upload Dokumen Hasil Lab Lain
-          </Button>
         </Form.Item>
 
         <Form.Item name="form_catatan" label="Catatan">
@@ -1073,77 +989,6 @@ const FormPengajuanLimbah: React.FC = () => {
           />
         </Form.Item>
 
-        {/* <Form.Item
-          name="form_link_input_dokumen_lingkungan_rs"
-          label="Link Dokumen Lingkungan"
-          rules={[
-            {
-              required: form.link_input_dokumen_lingkungan_rs.length < 1,
-            },
-          ]}
-        >
-          <Input
-            onChange={handleChangeInput}
-            style={inputStyles}
-            value={form.link_input_dokumen_lingkungan_rs}
-            name="link_input_dokumen_lingkungan_rs"
-          />
-          <Button
-            style={{ textDecoration: "underline" }}
-            icon={<ExportOutlined />}
-            onClick={() => window.open(linkUploadLingkungan, "_blank")}
-            type="link"
-          >
-            Klik Untuk Upload Dokumen Uji Lingkungan
-          </Button>
-        </Form.Item> */}
-
-        {/* <Form.Item
-          name="form_link_input_swa_pantau"
-          label="Link Dokumen SWA Pantau"
-          rules={[
-            {
-              required: form.link_input_swa_pantau.length < 1,
-            },
-          ]}>
-          <Input
-            onChange={handleChangeInput}
-            style={inputStyles}
-            value={form.link_input_swa_pantau}
-            name="link_input_swa_pantau"
-          />
-          <Button
-            style={{ textDecoration: "underline" }}
-            icon={<ExportOutlined />}
-            onClick={() => window.open(linkUploadSwaPantau, "_blank")}
-            type="link">
-            Klik Untuk Upload Dokumen SWA Pantau
-          </Button>
-        </Form.Item>
-
-        <Form.Item
-          name="form_link_input_ujilab_cair"
-          label="Link Dokumen Uji Lab Cair"
-          rules={[
-            {
-              required: form.link_input_ujilab_cair.length < 1,
-            },
-          ]}>
-          <Input
-            onChange={handleChangeInput}
-            style={inputStyles}
-            value={form.link_input_ujilab_cair}
-            name="link_input_ujilab_cair"
-          />
-          <Button
-            style={{ textDecoration: "underline" }}
-            icon={<ExportOutlined />}
-            onClick={() => window.open(linkUploadUjiLabCair, "_blank")}
-            type="link">
-            Klik Untuk Upload Dokumen Uji Lab Limbah Cair
-          </Button> */}
-        {/* </Form.Item> */}
-
         <Divider />
 
         <Form.Item {...tailLayout}>
@@ -1157,7 +1002,7 @@ const FormPengajuanLimbah: React.FC = () => {
                 boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)",
               }}
             >
-              Submit
+              {deferSubmit ? 'Berikutnya' : 'Submit'}
             </Button>
           </Space>
         </Form.Item>
@@ -1166,7 +1011,8 @@ const FormPengajuanLimbah: React.FC = () => {
   };
 
   return (
-    <>
+    <> 
+      {contextHolder}
       <Form form={formInstance}>
         <br />
         <Space wrap>
@@ -1210,7 +1056,7 @@ const FormPengajuanLimbah: React.FC = () => {
               value={form.tahun}
               maxLength={4}
               name="tahun"
-              disabled={isEditMode}
+              disabled={isEditMode || !!lockPeriodYear}
             />
           </Form.Item>
         </Space>

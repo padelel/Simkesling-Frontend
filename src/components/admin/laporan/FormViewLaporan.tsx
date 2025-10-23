@@ -39,7 +39,8 @@ import router from "next/router";
 import { useGlobalStore } from "@/stores/globalStore";
 import apifile from "@/utils/HttpRequestFile";
 import Notif from "@/utils/Notif";
-import jwtDecode from "jwt-decode";
+
+import { useUserLoginStore } from "@/stores/userLoginStore";
 
 const { RangePicker } = DatePicker;
 
@@ -99,6 +100,7 @@ const tabListNoTitle = [
 
 const FormViewLaporan: React.FC = () => {
   const globalStore = useGlobalStore();
+  const userLoginStore = useUserLoginStore();
   const [formListKey, setFormListKey] = useState(new Date().toISOString());
   const laporanBulananStore = useLaporanBulananStore();
   const [transporterOptions, setTransporterOptions] = useState<
@@ -464,22 +466,8 @@ const FormViewLaporan: React.FC = () => {
   };
 
   useLayoutEffect(() => {
-    let token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/");
-      return;
-    }
-    
-    let user: any = null;
-    try {
-      user = jwtDecode(token);
-      if (!user) {
-        router.push("/");
-        return;
-      }
-      console.log(user);
-    } catch (error) {
-      console.error('Invalid token:', error);
+    const user = userLoginStore.user;
+    if (!user) {
       router.push("/");
       return;
     }

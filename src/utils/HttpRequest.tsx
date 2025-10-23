@@ -6,10 +6,13 @@ import Cookies from "js-cookie";
 import { useRouter } from "next/router";
 import React from "react"; // Import React
 
+// Base URL dari env (fallback ke same-origin path saat dev)
+const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "/api/v1";
+
 // Create an instance of Axios with custom configurations
 const api = axios.create({
   // --- UBAH BARIS INI UNTUK DEVELOPMENT LOKAL ---
-  baseURL: "http://localhost:8000/api/v1", // Ganti ke URL backend lokal Anda
+  baseURL: apiBase,
   // baseURL: "https://be-simkesling.lalapan-depok.com/api/v1", 
   timeout: 30000, 
   headers: {
@@ -64,7 +67,7 @@ export const useApiWithNotification = () => {
   
   const apiWithNotification = axios.create({
     // --- UBAH BARIS INI JUGA ---
-    baseURL: "http://localhost:8000/api/v1", // Ganti ke URL backend lokal Anda
+    baseURL: apiBase,
     // baseURL: "https://be-simkesling.lalapan-depok.com/api/v1",
     timeout: 30000,
     headers: {
@@ -76,13 +79,6 @@ export const useApiWithNotification = () => {
   // Request interceptor - sisipkan Authorization Bearer jika token tersedia
   apiWithNotification.interceptors.request.use(
     (config: any) => {
-      try {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-        if (token) {
-          config.headers = config.headers || {};
-          config.headers["Authorization"] = `Bearer ${token}`;
-        }
-      } catch {}
       return config;
     },
     (error: any) => {
@@ -154,13 +150,6 @@ export const useApiWithNotification = () => {
 // Request interceptor untuk api default: sisipkan Authorization Bearer
 api.interceptors.request.use(
   (config: any) => {
-    try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      if (token) {
-        config.headers = config.headers || {};
-        config.headers["Authorization"] = `Bearer ${token}`;
-      }
-    } catch {}
     return config;
   },
   (error: any) => {
@@ -187,18 +176,34 @@ api.interceptors.response.use(
   },
   (error: any) => {
     console.error(error);
-    if (error.response) {
-      if (error.response.data) {
-        console.log(error.response.status);
-        if (error.response.status == 401) {
-          localStorage.removeItem("user");
-          Cookies.remove("username");
-          Cookies.remove("nama_user");
-          window.location.href = "/";
-          return Promise.reject(error);
-        }
-      }
+    const status = error?.response?.status;
+    const message = error?.response?.data?.message || "Terjadi kesalahan";
+    const details = error?.response?.data?.data;
+    const fields = details ? Object.keys(details).join(", ") : undefined;
+    const title = status ? `Error ${status}` : "Error";
+
+    if (status === 401) {
+      localStorage.removeItem("user");
+      Cookies.remove("username");
+      Cookies.remove("nama_user");
+      window.location.href = "/";
+      return Promise.reject(error);
     }
+
+    if (status === 400) {
+      Notif("error", title, fields ? `${message} (Field: ${fields})` : message);
+    } else if (status === 403) {
+      Notif("error", title, "Anda tidak memiliki izin untuk aksi ini.");
+    } else if (status === 404) {
+      Notif("error", title, "Endpoint tidak ditemukan atau resource tidak tersedia.");
+    } else if (status === 409) {
+      Notif("error", title, message || "Data duplikat terdeteksi.");
+    } else if (status && status >= 500) {
+      Notif("error", title, "Terjadi kesalahan pada server. Coba beberapa saat lagi.");
+    } else {
+      Notif("error", title, message);
+    }
+
     return Promise.reject(error);
   }
 );

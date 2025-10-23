@@ -28,7 +28,7 @@ const CobaApiPage: React.FC = () => {
     dataForm.append("password", dari_form_password);
 
     let responsenya = await api.post("/login", dataForm);
-    localStorage.setItem("token", responsenya.data.data.token);
+    // Jangan simpan JWT di localStorage; backend akan set cookie HttpOnly
     console.log(responsenya);
     setDatalogin(JSON.stringify(responsenya.data, null, 4));
   };

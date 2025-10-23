@@ -19,8 +19,8 @@ const cspProd = [
   "object-src 'none'",
   "frame-ancestors 'none'",
   `img-src 'self' data: ${imageDomains.join(' ')}`,
-  "font-src 'self' fonts.gstatic.com data:",
-  "style-src 'self' fonts.googleapis.com",
+  "font-src 'self' data:",
+  `style-src 'self' 'nonce-${cspNonce}'`,
   "script-src 'self'",
   "connect-src 'self' https://be-simkesling.lalapan-depok.com",
 ].join('; ') + ';';
@@ -32,11 +32,11 @@ const cspDev = [
   "form-action 'self'",
   "object-src 'none'",
   `img-src 'self' data: ${imageDomains.join(' ')}`,
-  "font-src 'self' fonts.gstatic.com data:",
-  "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
+  "font-src 'self' data:",
+  "style-src 'self' 'unsafe-inline'",
   "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
   // restrict websocket to explicit localhost ports used during dev
-  "connect-src 'self' http://localhost:8000 ws://localhost:3001 ws://localhost:3002",
+  "connect-src 'self' http://127.0.0.1:8000 ws://localhost:3001 ws://localhost:3002",
   "frame-ancestors 'none'",
 ].join('; ') + ';';
 
@@ -48,15 +48,17 @@ const cspScan = [
   "object-src 'none'",
   "frame-ancestors 'none'",
   `img-src 'self' data: ${imageDomains.join(' ')}`,
-  "font-src 'self' fonts.gstatic.com data:",
-  `style-src 'self' 'nonce-${cspNonce}' fonts.googleapis.com`,
+  "font-src 'self' data:",
+  `style-src 'self' 'nonce-${cspNonce}'`,
   "script-src 'self'",
-  "connect-src 'self' http://localhost:3000 http://localhost:3001 http://localhost:3002 http://localhost:8000",
+  "connect-src 'self' http://localhost:3000 http://localhost:3001 http://localhost:3002 http://127.0.0.1:8000",
 ].join('; ') + ';';
 
 const nextConfig = {
   reactStrictMode: false,
   poweredByHeader: false,
+  // Use a single dist directory to avoid Windows EPERM on .next-dev\trace
+  distDir: '.next',
   images: {
     domains: imageDomains,
   },
@@ -96,7 +98,18 @@ const nextConfig = {
       },
     ];
   },
+  async rewrites() {
+    // Proxy API to backend during dev/scan to achieve same-origin requests
+    if (!isProd) {
+      return [
+        {
+          source: '/api/:path*',
+          destination: 'http://127.0.0.1:8000/api/:path*',
+        },
+      ];
+    }
+    return [];
+  },
 };
 
 module.exports = nextConfig;
-

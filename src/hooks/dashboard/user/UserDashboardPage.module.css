@@ -1,0 +1,15 @@
+.container { padding: 40px 20px; text-align: center; }
+.heading { margin-bottom: 40px; font-size: 2.5rem; font-weight: bold; }
+.subheading { margin-bottom: 60px; font-size: 1.2rem; color: #666; }
+
+.card { text-align: center; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); transition: all 0.3s ease; }
+.card :global(.ant-card-body) { padding: 40px 20px; }
+
+.icon { font-size: 4rem; margin-bottom: 20px; }
+.icon :global(svg) { fill: currentColor; stroke: currentColor; }
+.iconPadat { color: #1890ff !important; }
+.iconCair { color: #52c41a !important; }
+.iconLab { color: #722ed1 !important; }
+
+.cardTitle { margin-bottom: 10px; font-size: 1.5rem; }
+.cardText { color: #666; margin: 0; }

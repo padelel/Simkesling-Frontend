@@ -36,6 +36,7 @@ export interface User {
   link_lab_ipal: string;
   link_lab_lain: string;
   link_dokumen_lingkungan_rs: string;
+  link_rincian_teknis?: string;
   link_izin_transporter: string;
   link_mou_transporter: string;
   link_swa_pantau: string;

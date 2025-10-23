@@ -1,13 +1,3 @@
-import MainLayout from "@/components/MainLayout";
-import FormPengajuanLimbahCair from "@/components/formpuskesmas/pengajuanLimbah/FormPengajuanLimbahCair";
-import React from "react";
-
-const PageTambahLimbah = () => {
-  return (
-    <MainLayout title="Form Laporan Limbah Cair">
-      <FormPengajuanLimbahCair />
-    </MainLayout>
-  );
-};
+import PageTambahLimbah from "@/hooks/dashboard/user/limbah-cair/PageTambahLimbah";
 
 export default PageTambahLimbah;

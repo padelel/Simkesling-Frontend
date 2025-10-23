@@ -82,7 +82,7 @@ export const useUserLoginStore = create<UserLoginState>((set) => ({
 
     try {
       // Axios sudah dikonfigurasi dengan withCredentials: true
-      const resp = await api.post("/login", payload);
+      let resp = await api.post("/login", payload);
       console.debug("[login] resp.status:", resp?.status, "resp.data:", resp?.data);
 
       // Robust parse: jika body berformat string, coba JSON.parse atau potong bagian JSON
@@ -101,6 +101,27 @@ export const useUserLoginStore = create<UserLoginState>((set) => ({
         }
       }
 
+      // Jika validator backend tidak mengenali JSON (dev server tertentu), fallback ke form-urlencoded
+      const needsFallback = (resp?.status === 400) || (
+        body?.code === 400 && body?.data && typeof body.data === 'object' && (
+          body.data.username || body.data.password
+        )
+      );
+      if (needsFallback) {
+        try {
+          const form = new URLSearchParams();
+          form.append('username', payload.username);
+          form.append('password', payload.password);
+          resp = await api.post('/login', form.toString(), {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          });
+          body = resp?.data ?? body;
+          console.debug("[login:fallback] resp.status:", resp?.status, "resp.data:", resp?.data);
+        } catch (e) {
+          console.warn("[login] fallback form-urlencoded failed:", e);
+        }
+      }
+
       // Normalisasi struktur response ala ResponseBuilder
       const payloadData = (body?.data && typeof body.data === 'object') ? body.data : body;
       const successFlag = (body?.success === true) || (resp?.status === 200);
@@ -115,14 +136,9 @@ export const useUserLoginStore = create<UserLoginState>((set) => ({
         const user = userCandidate as MUser['user'];
         const token = tokenCandidate || "";
 
-        // Simpan token untuk Authorization Bearer di request selanjutnya
-        if (token) {
-          localStorage.setItem("token", token);
-          Cookies.set("token", token, { expires: 1 });
-        }
-
-        // Simpan data user untuk persistensi UI
-        localStorage.setItem("user", JSON.stringify(user));
+        // Jangan simpan JWT di localStorage/cookie; backend sudah set HttpOnly cookie
+        // Hilangkan persistensi token/user di storage klien
+        // (tetap gunakan state store untuk konsumsi UI)
 
         // Update state store agar komponen lain yang berlangganan store langsung mendapatkan user/token
         try {

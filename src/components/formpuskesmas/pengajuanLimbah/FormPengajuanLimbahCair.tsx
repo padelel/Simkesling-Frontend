@@ -39,8 +39,8 @@ import { useLaporanBulananStore } from "@/stores/laporanBulananStore";
 import router from "next/router";
 import { useGlobalStore } from "@/stores/globalStore";
 import apifile from "@/utils/HttpRequestFile";
-import Notif from "@/utils/Notif";
-import jwtDecode from "jwt-decode";
+import { useNotification } from "@/utils/Notif";
+
 
 const { RangePicker } = DatePicker;
 
@@ -95,13 +95,37 @@ const tabListNoTitle = [
   },
 ];
 
-const FormPengajuanLimbahCair: React.FC = () => {
+type FormPengajuanLimbahCairProps = {
+  disableRedirect?: boolean;
+  onSuccess?: (data?: any) => void;
+  initialPeriode?: number;
+  initialTahun?: number | string;
+  lockPeriodYear?: boolean;
+  deferSubmit?: boolean;
+  onCollectData?: (data: FormData) => void;
+  onCollectDraft?: (draft: any) => void;
+  draftData?: any;
+};
+
+const FormPengajuanLimbahCair: React.FC<FormPengajuanLimbahCairProps> = ({
+  disableRedirect,
+  onSuccess,
+  initialPeriode,
+  initialTahun,
+  lockPeriodYear,
+  deferSubmit,
+  onCollectData,
+  onCollectDraft,
+  draftData,
+}) => {
   const globalStore = useGlobalStore();
   const [formListKey, setFormListKey] = useState(new Date().toISOString());
   const laporanBulananStore = useLaporanBulananStore();
   const [linkUploadManifest, setlinkUploadManifest] = useState("");
   const [linkUploadLogbook, setlinkLogbook] = useState("");
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isPeriodTaken, setIsPeriodTaken] = useState(false);
+  const { showNotification, contextHolder } = useNotification();
   
   // State untuk dropdown transporter - DIHAPUS
   // const [transporterOptions, setTransporterOptions] = useState<
@@ -132,33 +156,115 @@ const FormPengajuanLimbahCair: React.FC = () => {
   const [form, setForm] = useState(cloneDeep(tmpForm));
   const [formInstance] = Form.useForm();
 
+  // Restore draft when available
+  useEffect(() => {
+    if (draftData) {
+      try {
+        const normalized = {
+          ...form,
+          oldid: draftData.oldid ?? form.oldid ?? "",
+          periode: typeof draftData.periode === 'number' ? draftData.periode : parseInt(draftData.periode ?? form.periode ?? 0) || form.periode,
+          tahun: (draftData.tahun ?? form.tahun ?? '').toString(),
+          ph: draftData.ph != null ? parseFloat(draftData.ph) : form.ph,
+          bod: draftData.bod != null ? parseFloat(draftData.bod) : form.bod,
+          cod: draftData.cod != null ? parseFloat(draftData.cod) : form.cod,
+          tss: draftData.tss != null ? parseFloat(draftData.tss) : form.tss,
+          minyak_lemak: draftData.minyak_lemak != null ? parseFloat(draftData.minyak_lemak) : form.minyak_lemak,
+          amoniak: draftData.amoniak != null ? parseFloat(draftData.amoniak) : form.amoniak,
+          total_coliform: draftData.total_coliform != null ? parseInt(draftData.total_coliform) : form.total_coliform,
+          debit_air_limbah: draftData.debit_air_limbah != null ? parseFloat(draftData.debit_air_limbah) : form.debit_air_limbah,
+          link_ujilab_cair: draftData.link_ujilab_cair ?? form.link_ujilab_cair ?? "",
+          link_lab_ipal: draftData.link_lab_ipal ?? form.link_lab_ipal ?? "",
+          kapasitas_ipal: draftData.kapasitas_ipal ?? form.kapasitas_ipal ?? "",
+        };
+        setForm(normalized);
+        formInstance?.setFieldsValue?.({
+          form_periode: normalized.periode,
+          form_tahun: normalized.tahun,
+          form_ph: normalized.ph,
+          form_bod: normalized.bod,
+          form_cod: normalized.cod,
+          form_tss: normalized.tss,
+          form_minyak_lemak: normalized.minyak_lemak,
+          form_amoniak: normalized.amoniak,
+          form_total_coliform: normalized.total_coliform,
+          form_debit_air_limbah: normalized.debit_air_limbah,
+          form_link_ujilab_cair: normalized.link_ujilab_cair,
+          form_link_lab_ipal: normalized.link_lab_ipal,
+          form_kapasitas_ipal:
+            normalized.kapasitas_ipal === "Tidak ada pemeriksaan"
+              ? "Tidak ada pemeriksaan"
+              : (normalized.kapasitas_ipal ? parseFloat(normalized.kapasitas_ipal as any) : undefined),
+        });
+      } catch {}
+    }
+  }, [draftData]);
+
   const handleChangeInput = (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    setForm({
+    const updated = {
       ...form,
       [event.target.name]: event.target.value,
-    });
+    };
+    setForm(updated);
+    if (onCollectDraft) { try { onCollectDraft(updated); } catch {} }
   };
 
   const handleChangeSelect = (val: any, name: string, event: any) => {
-    // Hapus logika transporter
-    // if (name === "id_transporter") {
-    //   const id_transporter = parseInt(val);
-    //   setSelectedTransporter(id_transporter);
-    // }
-    
     // Ensure periode is stored as integer
     let processedVal = val;
     if (name === "periode") {
       processedVal = parseInt(val);
     }
-    
-    setForm({
+    const updated = {
       ...form,
       [name]: processedVal,
-    });
+    };
+    setForm(updated);
+    if (onCollectDraft) { try { onCollectDraft(updated); } catch {} }
   };
+
+  // Fungsi precheck duplikasi periode/tahun pada limbah cair
+  const precheckExistingPeriod = async (
+    periodeOverride?: number | string,
+    tahunOverride?: number | string
+  ): Promise<boolean> => {
+    try {
+      const pRaw = typeof periodeOverride !== 'undefined' ? periodeOverride : form.periode;
+      const tRaw = typeof tahunOverride !== 'undefined' ? tahunOverride : form.tahun;
+      const p = parseInt(String(pRaw));
+      const t = parseInt(String(tRaw));
+      // Skip jika belum lengkap atau sedang edit
+      if (isNaN(p) || isNaN(t) || isEditMode) {
+        setIsPeriodTaken(false);
+        return false;
+      }
+      const resp = await api.post('/user/limbah-cair/data', { periode: p, tahun: t }).catch(() => null);
+      const arrA = resp?.data?.data; // bentuk: data: []
+      const arrB = resp?.data?.data?.values; // bentuk: data: { values: [] }
+      const list = Array.isArray(arrA) ? arrA : (Array.isArray(arrB) ? arrB : []);
+      const taken = Array.isArray(list) && list.length > 0;
+      setIsPeriodTaken(taken);
+      if (taken) {
+        showNotification(
+          'warning',
+          'Periode sudah ada',
+          'Periode yang dipilih sudah memiliki data limbah cair. Silakan gunakan mode edit atau pilih periode lain.'
+        );
+      }
+      return taken;
+    } catch (err) {
+      // Abaikan error silent, anggap tidak ada duplikasi
+      setIsPeriodTaken(false);
+      return false;
+    }
+  };
+  
+  // Trigger precheck saat periode/tahun berubah
+  useEffect(() => {
+    precheckExistingPeriod().catch(() => {});
+  }, [form.periode, form.tahun, isEditMode]);
 
   // Fungsi untuk mengambil data transporter - DIHAPUS
   // const getTransporterData = async () => {
@@ -189,8 +295,21 @@ const FormPengajuanLimbahCair: React.FC = () => {
       
       // Validasi data sebelum submit - hapus validasi transporter
       if (!form.periode || !form.tahun) {
-        Notif("error", "Error!", "Periode dan Tahun harus diisi");
+        showNotification("error", "Error!", "Periode dan Tahun harus diisi");
         return;
+      }
+
+      // Validasi periode tidak boleh duplikasi (kecuali mode edit)
+      if (!isEditMode) {
+        const periodTaken = await precheckExistingPeriod();
+        if (periodTaken) {
+          showNotification(
+            "error", 
+            "Periode sudah ada", 
+            "Periode yang dipilih sudah memiliki data limbah cair. Silakan pilih periode lain atau gunakan mode edit."
+          );
+          return;
+        }
       }
       
       let dataForm: any = new FormData();
@@ -246,24 +365,65 @@ const FormPengajuanLimbahCair: React.FC = () => {
         url = "/user/limbah-cair/update";
       }
 
-            let responsenya = await api.post(url, dataForm);
-      // Tampilkan notifikasi sukses langsung
-      Notif("success", "Success.!", "Berhasil Simpan Laporan Limbah Cair");
-      // Simpan flash notif untuk halaman daftar setelah redirect
       try {
-        const flashPayload = {
-          type: "success",
-          title: "Success.!",
-          description: "Berhasil Simpan Laporan Limbah Cair",
-        };
-        sessionStorage.setItem("flash_notif", JSON.stringify(flashPayload));
-      } catch (err) {
-        console.warn("Gagal menyimpan flash_notif ke sessionStorage:", err);
+        // Jika diminta menunda submit, kirim data ke parent dan jangan panggil API
+        if (deferSubmit) {
+          showNotification("info", "Draft disiapkan", "Data Limbah Cair akan disimpan saat submit laporan lab.");
+          if (onCollectData) { try { onCollectData(dataForm); } catch {} }
+          if (onCollectDraft) { try { onCollectDraft(form); } catch {} }
+          if (onSuccess) { try { onSuccess(); } catch {} }
+          return;
+        }
+        let responsenya = await api.post(url, dataForm);
+        const serverMsg = (responsenya?.data?.message) ? responsenya.data.message : "Berhasil Simpan Laporan Limbah Cair";
+        showNotification("success", "Sukses", serverMsg);
+        try {
+          const flashPayload = {
+            type: "success",
+            title: "Sukses",
+            description: serverMsg,
+          };
+          sessionStorage.setItem("flash_notif", JSON.stringify(flashPayload));
+        } catch (err) {
+          console.warn("Gagal menyimpan flash_notif ke sessionStorage:", err);
+        }
+        if (!disableRedirect) {
+          router.push("/dashboard/user/limbah-cair");
+        }
+        if (onSuccess) {
+          try { onSuccess(responsenya?.data); } catch {}
+        }
+      } catch (e) {
+        console.error(e);
+        const status = (e as any)?.response?.status;
+        const message = (e as any)?.response?.data?.message || "Gagal menyimpan laporan limbah cair";
+        const details = (e as any)?.response?.data?.data;
+        const fields = details ? Object.keys(details).join(", ") : undefined;
+        const title = status ? `Error ${status}` : "Error";
+
+        if (status === 400) {
+          if (fields) {
+            showNotification("error", title, `${message} (Field: ${fields})`);
+          } else {
+            showNotification("error", title, message);
+          }
+        } else if (status === 401) {
+          showNotification("error", title, "Sesi login berakhir. Silakan login kembali.");
+        } else if (status === 403) {
+          showNotification("error", title, "Anda tidak memiliki izin untuk aksi ini.");
+        } else if (status === 404) {
+          showNotification("error", title, "Endpoint tidak ditemukan atau resource tidak tersedia.");
+        } else if (status === 409) {
+          showNotification("error", title, message || "Data duplikat terdeteksi.");
+        } else if (status && status >= 500) {
+          showNotification("error", title, "Terjadi kesalahan pada server. Coba beberapa saat lagi.");
+        } else {
+          showNotification("error", title, message);
+        }
       }
-      router.push("/dashboard/user/limbah-cair");
     } catch (e) {
       console.error(e);
-      Notif("error", "Error!", "Gagal menyimpan laporan limbah cair");
+      showNotification("error", "Error!", "Gagal menyimpan laporan limbah cair");
     } finally {
       if (globalStore.setLoading) globalStore.setLoading(false);
     }
@@ -290,10 +450,11 @@ const FormPengajuanLimbahCair: React.FC = () => {
         // Jika nilai adalah "Tidak ada pemeriksaan", tetap tampilkan nilai tersebut
         const kapasitasValue = user.kapasitas_ipal;
         
-        setForm(prevForm => ({
-          ...prevForm,
-          kapasitas_ipal: kapasitasValue
-        }));
+        setForm(prevForm => {
+          const next = { ...prevForm, kapasitas_ipal: kapasitasValue };
+          if (onCollectDraft) { try { onCollectDraft(next); } catch {} }
+          return next;
+        });
         
         // Update form instance - jika "Tidak ada pemeriksaan", set sebagai string, jika tidak set sebagai number
         if (user.kapasitas_ipal === "Tidak ada pemeriksaan") {
@@ -391,42 +552,39 @@ const FormPengajuanLimbahCair: React.FC = () => {
     const action = urlParams.get("action");
     const id = urlParams.get("id");
 
-    // Set edit mode state
     setIsEditMode(action === "edit");
 
-    // Check if this is edit mode and if edit data exists
     if (action === "edit" && id) {
-      // Check if edit data exists in localStorage
       const editData = localStorage.getItem('editLimbahCairData');
       
       if (!editData) {
-        // If no edit data found on refresh, redirect to index page
         router.push('/dashboard/user/limbah-cair');
         return;
       }
     }
 
-    // Set default periode dan tahun sesuai waktu terkini
     const currentDate = new Date();
-    const currentMonth = currentDate.getMonth() + 1; // Integer 1-12
-    const currentYear = currentDate.getFullYear().toString();
+    const currentMonth = (typeof initialPeriode === 'number' ? initialPeriode : (currentDate.getMonth() + 1));
+    const currentYear = (initialTahun != null ? String(initialTahun) : currentDate.getFullYear().toString());
 
-    setForm({
-      ...form,
-      periode: currentMonth,
-      tahun: currentYear,
-    });
+    if (!draftData) {
+      const nextForm = {
+        ...form,
+        periode: currentMonth,
+        tahun: currentYear,
+      };
+      setForm(nextForm);
+      if (onCollectDraft) { try { onCollectDraft(nextForm); } catch {} }
 
-    formInstance.setFieldsValue({
-      form_periode: currentMonth,
-      form_tahun: currentYear,
-    });
+      formInstance.setFieldsValue({
+        form_periode: currentMonth,
+        form_tahun: currentYear,
+      });
+    }
 
     if (action === "edit" && id) {
-      // Jika mode edit, proses data edit dari localStorage
       processEditData();
     } else {
-      // Jika bukan edit mode, ambil data kapasitas IPAL dari user profile
       getUserProfileData();
     }
   }, []);
@@ -452,7 +610,7 @@ const FormPengajuanLimbahCair: React.FC = () => {
               placeholder="Pilih Bulan Periode"
               onChange={(v) => handleChangeSelect(v, "periode", event)}
               style={{ width: 200 }}
-              disabled={isEditMode}
+              disabled={isEditMode || !!lockPeriodYear}
               value={form.periode}
               options={[
                 { value: 1, label: "Januari" },
@@ -481,7 +639,7 @@ const FormPengajuanLimbahCair: React.FC = () => {
               value={form.tahun}
               maxLength={4}
               name="tahun"
-              disabled={isEditMode}
+              disabled={isEditMode || !!lockPeriodYear}
             />
           </Form.Item>
         </Space>
@@ -640,18 +798,6 @@ const FormPengajuanLimbahCair: React.FC = () => {
 
         <Divider>Link Dokumen</Divider>
 
-        <Form.Item
-          name="form_link_lab_ipal"
-          label="Link Persetujuan Teknis"
-          rules={[{ required: true }]}
-        >
-          <Input
-            onChange={handleChangeInput}
-            value={form.link_lab_ipal}
-            name="link_lab_ipal"
-            style={inputStyles}
-          />
-        </Form.Item>
 
         <Form.Item
           name="form_link_ujilab_cair"
@@ -678,20 +824,22 @@ const FormPengajuanLimbahCair: React.FC = () => {
                 boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)",
               }}
             >
-              Simpan Laporan Limbah Cair
+              {deferSubmit ? 'Berikutnya' : 'Simpan Laporan Limbah Cair'}
             </Button>
-            <Button
-              size="large"
-              onClick={() => router.push("/dashboard/user/limbah-cair")}
-              style={{
-                backgroundColor: "#FFFF00",
-                borderColor: "#FFFF00",
-                color: "black",
-                boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)",
-              }}
-            >
-              Kembali
-            </Button>
+            {!deferSubmit && (
+              <Button
+                size="large"
+                onClick={() => router.push("/dashboard/user/limbah-cair")}
+                style={{
+                  backgroundColor: "#FFFF00",
+                  borderColor: "#FFFF00",
+                  color: "black",
+                  boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)",
+                }}
+              >
+                Kembali
+              </Button>
+            )}
           </Space>
         </Form.Item>
       </div>
@@ -708,6 +856,7 @@ const FormPengajuanLimbahCair: React.FC = () => {
 
   return (
     <>
+      {contextHolder}
       <Form 
         form={formInstance}
         {...layout}

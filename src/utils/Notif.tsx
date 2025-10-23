@@ -1,4 +1,5 @@
 "use client";
+import React from "react";
 import {
   Button,
   Card,
@@ -8,6 +9,7 @@ import {
   Row,
   notification,
   Space,
+  message as antdMessage,
 } from "antd";
 import { NotificationInstance } from "antd/es/notification/interface";
 
@@ -19,15 +21,25 @@ export const useNotification = () => {
   
   const showNotification = (
     type: NotificationType,
-    message: any = "",
-    description: any = "",
+    msg: any = "",
+    desc: any = "",
     duration: number = 5
   ) => {
     api[type]({
-      message,
-      description,
+      message: msg,
+      description: desc,
       duration,
     });
+    // Fallback tambahan untuk memastikan terlihat di dev overlay
+    if (type === "error" || type === "warning") {
+      const content = typeof desc !== "undefined" && desc !== "" ? desc : msg;
+      // Gunakan API message.open agar bisa menerima ReactNode
+      antdMessage.open({
+        type,
+        content: content as any,
+        duration,
+      });
+    }
   };
 
   return { showNotification, contextHolder };
@@ -36,15 +48,25 @@ export const useNotification = () => {
 // Fallback untuk backward compatibility (akan deprecated)
 const Notif = (
   type: NotificationType,
-  message: any = "",
-  description: any = "",
+  msg: any = "",
+  desc: any = "",
   duration: number = 5
 ) => {
   notification[type]({
-    message,
-    description,
+    message: msg,
+    description: desc,
     duration,
   });
+  // Fallback tambahan agar error/warning selalu terlihat
+  if (type === "error" || type === "warning") {
+    const content = typeof desc !== "undefined" && desc !== "" ? desc : msg;
+    // Gunakan API message.open agar bisa menerima ReactNode
+    antdMessage.open({
+      type,
+      content: content as any,
+      duration,
+    });
+  }
 };
 
 export default Notif;

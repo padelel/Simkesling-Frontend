@@ -1,18 +1,3 @@
-import MainLayout from "@/components/MainLayout";
-import FormTransporter from "@/components/formpuskesmas/transporter/FormTransporter";
-import ViewTransporter from "@/components/formpuskesmas/transporter/ViewTransporter";
-import router from "next/router";
-import React from "react";
-
-const PageViewTransporter = () => {
-  return (
-    <MainLayout title={"View Transporter"}>
-<h2 className="text-center">{"View Transporter"}</h2>
-<div className="flex-center">
-        <ViewTransporter />
-      </div>
-    </MainLayout>
-  );
-};
+import { PageViewTransporter } from "@/hooks/dashboard/user/transporter";
 
 export default PageViewTransporter;

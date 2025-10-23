@@ -20,12 +20,14 @@ interface FormViewLaporanLabProps {
   propLabData?: MLaporanLab | false;
   selectedPeriode?: number;
   selectedTahun?: number;
+  selectedIdLaporan?: number;
 }
 
 const FormViewLaporanLab: React.FC<FormViewLaporanLabProps> = ({ 
   propLabData,
   selectedPeriode,
-  selectedTahun
+  selectedTahun,
+  selectedIdLaporan
 }) => {
   const router = useRouter();
   
@@ -33,13 +35,58 @@ const FormViewLaporanLab: React.FC<FormViewLaporanLabProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Normalisasi periode/tahun agar filter eksak, mencegah Januari (1) cocok ke Oktober (10)
+  const monthNameToNumber = (val: any): number | null => {
+    if (val === null || val === undefined) return null;
+    if (typeof val === 'number') return val;
+    const str = String(val).trim().toLowerCase();
+    const asNum = parseInt(str, 10);
+    if (!isNaN(asNum)) return asNum;
+    const map: Record<string, number> = {
+      'januari': 1,
+      'februari': 2,
+      'maret': 3,
+      'april': 4,
+      'mei': 5,
+      'juni': 6,
+      'juli': 7,
+      'agustus': 8,
+      'september': 9,
+      'oktober': 10,
+      'november': 11,
+      'desember': 12,
+    };
+    return map[str] ?? null;
+  };
+
+  const extractPeriode = (item: any): number | null => {
+    const d = item?.item ?? item;
+    return monthNameToNumber(d?.periode ?? d?.periode_nama ?? item?.periode ?? item?.periode_nama);
+  };
+
+  const extractTahun = (item: any): number | null => {
+    const d = item?.item ?? item;
+    const t = d?.tahun ?? item?.tahun;
+    if (t === null || t === undefined) return null;
+    const num = typeof t === 'number' ? t : parseInt(String(t), 10);
+    return isNaN(num) ? null : num;
+  };
+
+  const extractId = (item: any): number | null => {
+    const d = item?.item ?? item;
+    const id = d?.id_laporan_lab ?? item?.id_laporan_lab ?? d?.id ?? item?.id;
+    if (id === null || id === undefined) return null;
+    const num = typeof id === 'number' ? id : parseInt(String(id), 10);
+    return isNaN(num) ? null : num;
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        console.log('FormViewLaporanLab - Fetching lab data with filters:', { selectedPeriode, selectedTahun });
+        console.log('FormViewLaporanLab - Fetching lab data with filters:', { selectedPeriode, selectedTahun, selectedIdLaporan });
         
         // Build request payload with filters
         const requestPayload: any = {};
@@ -49,14 +96,30 @@ const FormViewLaporanLab: React.FC<FormViewLaporanLabProps> = ({
         if (selectedTahun) {
           requestPayload.tahun = selectedTahun;
         }
+        // Note: API may not support filtering by id directly; we filter client-side
 
         const response = await api.post('/user/laporan-lab/data', requestPayload);
 
         console.log('FormViewLaporanLab - API Response:', response.data);
 
         if (response.data.success && response.data.data && response.data.data.data) {
-          console.log('FormViewLaporanLab - Setting lab data:', response.data.data.data);
-          setLabData(response.data.data.data);
+          let incomingData: any[] = response.data.data.data;
+
+          // Terapkan filter eksak di frontend untuk memastikan hanya bulan/tahun terpilih yang tampil
+          if (Array.isArray(incomingData)) {
+            if (selectedIdLaporan) {
+              incomingData = incomingData.filter((it) => extractId(it) === selectedIdLaporan);
+            }
+            if (selectedPeriode) {
+              incomingData = incomingData.filter((it) => extractPeriode(it) === selectedPeriode);
+            }
+            if (selectedTahun) {
+              incomingData = incomingData.filter((it) => extractTahun(it) === selectedTahun);
+            }
+          }
+
+          console.log('FormViewLaporanLab - Setting lab data (filtered):', incomingData);
+          setLabData(incomingData as MLaporanLab[]);
         } else {
           console.log('FormViewLaporanLab - API Error:', response.data.message);
           setError(response.data.message || 'Gagal mengambil data laporan lab');
@@ -72,7 +135,7 @@ const FormViewLaporanLab: React.FC<FormViewLaporanLabProps> = ({
     };
 
     fetchData();
-  }, [selectedPeriode, selectedTahun]);
+  }, [selectedPeriode, selectedTahun, selectedIdLaporan]);
 
   const handleBack = () => {
     router.back();

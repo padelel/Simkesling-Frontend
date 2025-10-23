@@ -35,7 +35,7 @@ import { fileTypeFromStream } from "file-type";
 import router from "next/router";
 import cloneDeep from "clone-deep";
 import { useGlobalStore } from "@/stores/globalStore";
-import jwtDecode from "jwt-decode";
+import { useUserLoginStore } from "@/stores/userLoginStore";
 
 type NotificationType = "success" | "info" | "warning" | "error";
 
@@ -65,6 +65,7 @@ const inputStyles = {
 };
 const FormPengajuanTransporter: React.FC = () => {
   const globalStore = useGlobalStore();
+const userLoginStore = useUserLoginStore();
   const [apimessageCreate, contextHolderCreate] =
     notification.useNotification();
   const [apimessageUpdate, contextHolderUpdate] =
@@ -526,8 +527,7 @@ router.push("/dashboard/user/transporter");
   useLayoutEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const action = urlParams.get("action");
-    let token = localStorage.getItem("token");
-    let user: any = jwtDecode(token ?? "");
+    const user = userLoginStore.user;
     if (!user) {
       router.push("/");
       return;

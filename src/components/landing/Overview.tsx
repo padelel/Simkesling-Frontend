@@ -21,7 +21,7 @@ const Overview: React.FC = () => {
       <Col xs={24} md={12}>
         <Card
           style={cardStyle}
-          bordered={false}
+          variant="borderless"
           title="Transportasi Limbah Kesehatan"
         >
           <div style={{ display: "flex", justifyContent: "center" }}>
@@ -40,7 +40,7 @@ const Overview: React.FC = () => {
         <Card
           style={cardStyle}
           title="Pengolahan Limbah Kesehatan"
-          bordered={false}
+          variant="borderless"
         >
           <div style={{ display: "flex", justifyContent: "center" }}>
             <Image

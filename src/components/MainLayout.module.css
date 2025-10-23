@@ -1,0 +1,33 @@
+.layout {
+  min-height: 100vh;
+}
+
+.sider {
+  /* rely on Ant Design default background from theme */
+}
+
+.logoBox {
+  display: flex;
+  justify-content: center;
+  margin-top: 30px;
+}
+
+.title {
+  text-align: center;
+}
+
+.header {
+  padding: 0;
+}
+
+.content {
+  margin: 10px 8px 0;
+}
+
+.inner {
+  padding: 8;
+}
+
+.footer {
+  text-align: center;
+}
