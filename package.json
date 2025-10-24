@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3001",
-    "build": "next build",
-    "start": "next start",
+    "build": "node --max_old_space_size=4096 ./node_modules/next/dist/bin/next build",
+    "build:windows": "node scripts/build.js",
+    "start": "node server.js",
     "lint": "next lint"
   },
   "dependencies": {
@@ -23,6 +24,7 @@
     "eslint": "8.47.0",
     "eslint-config-next": "13.4.13",
     "file-type": "^18.5.0",
+    "graceful-fs": "^4.2.11",
     "js-cookie": "^3.0.5",
     "json2csv": "^6.0.0-alpha.2",
     "jwt-decode": "^3.1.2",

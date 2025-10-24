@@ -68,6 +68,7 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  swcMinify: false,
   transpilePackages: ['react-apexcharts', 'apexcharts'],
   async headers() {
     return [

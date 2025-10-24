@@ -8,7 +8,7 @@ import { SizeType } from "antd/es/config-provider/SizeContext";
 import { SpaceSize } from "antd/es/space";
 import Link from "next/link";
 import FormLogin from "../login/FormLogin";
-import { Roboto } from "next/font/google";
+// import { Roboto } from "next/font/google";
 import { useGlobalStore } from "@/stores/globalStore";
 
 const CarrouselLanding = () => {
@@ -65,7 +65,7 @@ const CarrouselLanding = () => {
           height: "100%",
         }}
       >
-        <h2 style={{ fontFamily: "Roboto" }}>
+        <h2 style={{ fontFamily: "Roboto, Arial, sans-serif" }}>
           D&apos;Smiling
           <br />
           Depok Sistem Manajemen Kesehatan Lingkungan

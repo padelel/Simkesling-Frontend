@@ -8,9 +8,6 @@ import Cookies from "js-cookie";
 
 import "../styles/globals.css";
 
-import { Roboto } from "next/font/google";
-const roboto = Roboto({ subsets: ["latin"], weight: ["300","400","500","700"], display: "swap" });
-
 // Set CSP nonce to be used by Ant Design and style-loader
 const runtimeCookieNonce = typeof window !== "undefined" ? Cookies.get("nonce") : undefined;
 const nonce = runtimeCookieNonce || process.env.NEXT_PUBLIC_CSP_NONCE || process.env.CSP_NONCE || "DEVSCAN123";
@@ -49,7 +46,7 @@ const App = ({ Component, pageProps }: AppProps) => {
 
   return (
     <ConfigProvider theme={theme} nonce={nonce}>
-      <div className={roboto.className}>
+      <div>
         <AntdApp>
           <Component {...pageProps} />
         </AntdApp>
